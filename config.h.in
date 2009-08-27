@@ -3,6 +3,9 @@
 /* define this if ares is built for a big endian system */
 #undef ARES_BIG_ENDIAN
 
+/* Define to 1 if you have the $func function. */
+#undef AS_TR_CPP
+
 /* when building as static part of libcurl */
 #undef BUILDING_LIBCURL
 
@@ -117,7 +120,7 @@
 /* if your compiler supports LL */
 #undef HAVE_LL
 
-/* if your compiler supports long long */
+/* Define to 1 if the compiler supports the 'long long' data type. */
 #undef HAVE_LONGLONG
 
 /* Define to 1 if you have the malloc.h header file. */
@@ -149,6 +152,9 @@
 
 /* Define to 1 if you have the recv function. */
 #undef HAVE_RECV
+
+/* Define to 1 if you have the recvfrom function. */
+#undef HAVE_RECVFROM
 
 /* Define to 1 if you have the send function. */
 #undef HAVE_SEND
@@ -243,6 +249,9 @@
 /* Define to 1 if you need the malloc.h header file even with stdlib.h */
 #undef NEED_MALLOC_H
 
+/* Define to 1 if _REENTRANT preprocessor symbol must be defined. */
+#undef NEED_REENTRANT
+
 /* Define to 1 if your C compiler doesn't accept -c and -o together. */
 #undef NO_MINUS_C_MINUS_O
 
@@ -269,6 +278,36 @@
 
 /* a suitable file/device to read random data from */
 #undef RANDOM_FILE
+
+/* Define to the type of arg 1 for recvfrom. */
+#undef RECVFROM_TYPE_ARG1
+
+/* Define to the type pointed by arg 2 for recvfrom. */
+#undef RECVFROM_TYPE_ARG2
+
+/* Define to 1 if the type pointed by arg 2 for recvfrom is void. */
+#undef RECVFROM_TYPE_ARG2_IS_VOID
+
+/* Define to the type of arg 3 for recvfrom. */
+#undef RECVFROM_TYPE_ARG3
+
+/* Define to the type of arg 4 for recvfrom. */
+#undef RECVFROM_TYPE_ARG4
+
+/* Define to the type pointed by arg 5 for recvfrom. */
+#undef RECVFROM_TYPE_ARG5
+
+/* Define to 1 if the type pointed by arg 5 for recvfrom is void. */
+#undef RECVFROM_TYPE_ARG5_IS_VOID
+
+/* Define to the type pointed by arg 6 for recvfrom. */
+#undef RECVFROM_TYPE_ARG6
+
+/* Define to 1 if the type pointed by arg 6 for recvfrom is void. */
+#undef RECVFROM_TYPE_ARG6_IS_VOID
+
+/* Define to the function return type for recvfrom. */
+#undef RECVFROM_TYPE_RETV
 
 /* Define to the type of arg 1 for recv. */
 #undef RECV_TYPE_ARG1
@@ -306,9 +345,6 @@
 /* Define to the function return type for send. */
 #undef SEND_TYPE_RETV
 
-/* The size of `curl_off_t', as computed by sizeof. */
-#undef SIZEOF_CURL_OFF_T
-
 /* The size of `long', as computed by sizeof. */
 #undef SIZEOF_LONG
 
@@ -336,11 +372,9 @@
 /* Define to avoid automatic inclusion of winsock.h */
 #undef WIN32_LEAN_AND_MEAN
 
-/* Define to 1 if on AIX 3.
-   System headers sometimes define this.
-   We just want to avoid a redefinition error message.  */
+/* Define to 1 if OS is AIX. */
 #ifndef _ALL_SOURCE
-# undef _ALL_SOURCE
+#  undef _ALL_SOURCE
 #endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
@@ -355,7 +389,7 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
 
-/* type to use in place of in_addr_t if not defined */
+/* Type to use in place of in_addr_t when system does not provide it. */
 #undef in_addr_t
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */

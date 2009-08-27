@@ -1,21 +1,20 @@
-This is what's new and changed in the c-ares 1.5.2 release:
+This is what's new and changed in the c-ares 1.5.3 release:
 
- o code refactoring in ares_gethostbyaddr
- o improved checking of /dev/urandom in configure script
- o new sample application, acountry
- o improved MSVC6 dsp files
- o adig sample application supports NAPTR records
- o improved file seeding randomizer
- o improved parsing of resolver configuration files
- o updated configure script to remove autoconf 2.62 warnings
- o use monotonic time source if available
- o return all PTR-records when doing reverse lookups
- o millisecond resolution support for the timeout option
+ o fix adig sample application compilation failure on some systems
+ o fix pkg-config reporting of private libraries needed for static linking
+ o fallback to gettimeofday when monotonic clock is unavailable at run-time
+ o ares_gethostbyname() fallback from AAA to A records with CNAME present
+ o allow --enable-largefile and --disable-largefile configurations
+ o configure process no longer needs nor checks size of curl_off_t
+ o library will now be built with _REENTRANT symbol defined if needed
+ o Improved configure detection of number of arguments for getservbyport_r
+ o Improved query-ID randomness
+ o Validate that DNS response address matches the request address
+ o fix acountry sample application compilation failure on some systems
 
 Thanks go to these friendly people for their efforts and contributions:
 
- Erik Kline, Brad Spencer, Gisle Vanem, Alexey Simak, Eino Tuominen,
- Eino Tuominen, Yang Tse, Doug Goldstein, Sebastian<at>basti79.de,
+ Brad House, Yang Tse, Phil Blundell, Tofu Linden, George Neill
  and obviously Daniel Stenberg
 
 Have fun!

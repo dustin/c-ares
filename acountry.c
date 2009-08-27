@@ -1,5 +1,5 @@
 /*
- * $Id: acountry.c,v 1.3 2008-05-08 22:14:17 bagder Exp $
+ * $Id: acountry.c,v 1.6 2008-08-25 03:44:43 yangtse Exp $
  *
  * IP-address/hostname to country converter.
  *
@@ -47,7 +47,7 @@
 #include <strings.h>
 #endif
 
-#if defined(WIN32)
+#if defined(WIN32) && !defined(WATT32)
   #include <winsock.h>
 #else
   #include <arpa/inet.h>
@@ -59,6 +59,10 @@
 #include "ares_getopt.h"
 #include "inet_net_pton.h"
 #include "inet_ntop.h"
+
+#ifndef INADDR_NONE
+#define INADDR_NONE 0xffffffff
+#endif
 
 static const char *usage      = "acountry [-vh?] {host|addr} ...\n";
 static const char  nerd_fmt[] = "%u.%u.%u.%u.zz.countries.nerd.dk";
@@ -90,7 +94,7 @@ int main(int argc, char **argv)
   ares_channel channel;
   int    ch, status;
 
-#ifdef WIN32
+#if defined(WIN32) && !defined(WATT32)
   WORD wVersionRequested = MAKEWORD(USE_WINSOCK,USE_WINSOCK);
   WSADATA wsaData;
   WSAStartup(wVersionRequested, &wsaData);
@@ -158,7 +162,7 @@ int main(int argc, char **argv)
   wait_ares(channel);
   ares_destroy(channel);
 
-#ifdef WIN32
+#if defined(WIN32) && !defined(WATT32)
   WSACleanup();
 #endif
 

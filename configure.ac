@@ -1,9 +1,60 @@
-AC_INIT([c-ares], [1.5.2])
 AC_PREREQ(2.57)
+
+dnl Version not hardcoded here. Fetched later from ares_version.h
+AC_INIT([c-ares], [1.5.3],
+  [c-ares mailing list => http://cool.haxx.se/mailman/listinfo/c-ares])
+
 AC_CONFIG_SRCDIR([ares_ipv6.h])
 AM_CONFIG_HEADER([config.h])
 AM_MAINTAINER_MODE
-AM_INIT_AUTOMAKE
+
+dnl SED is mandatory for configure process and libtool.
+dnl Set it now, allowing it to be changed later.
+AC_PATH_PROG([SED], [sed], [not_found],
+  [$PATH:/usr/bin:/usr/local/bin])
+if test -z "$SED" || test "$SED" = "not_found"; then
+  AC_MSG_ERROR([sed not found in PATH. Cannot continue without sed.])
+fi
+AC_SUBST([SED])
+
+dnl GREP is mandatory for configure process and libtool.
+dnl Set it now, allowing it to be changed later.
+AC_PATH_PROG([GREP], [grep], [not_found],
+  [$PATH:/usr/bin:/usr/local/bin])
+if test -z "$GREP" || test "$GREP" = "not_found"; then
+  AC_MSG_ERROR([grep not found in PATH. Cannot continue without grep.])
+fi
+AC_SUBST([GREP])
+
+dnl EGREP is mandatory for configure process and libtool.
+dnl Set it now, allowing it to be changed later.
+if echo a | ($GREP -E '(a|b)') >/dev/null 2>&1; then
+  AC_MSG_CHECKING([for egrep])
+  EGREP="$GREP -E"
+  AC_MSG_RESULT([$EGREP])
+else
+  AC_PATH_PROG([EGREP], [egrep], [not_found],
+    [$PATH:/usr/bin:/usr/local/bin])
+fi
+if test -z "$EGREP" || test "$EGREP" = "not_found"; then
+  AC_MSG_ERROR([egrep not found in PATH. Cannot continue without egrep.])
+fi
+AC_SUBST([EGREP])
+
+dnl AR is mandatory for configure process and libtool.
+dnl This is target dependant, so check it as a tool.
+AC_PATH_TOOL([AR], [ar], [not_found],
+  [$PATH:/usr/bin:/usr/local/bin])
+if test -z "$AR" || test "$AR" = "not_found"; then
+  AC_MSG_ERROR([ar not found in PATH. Cannot continue without ar.])
+fi
+AC_SUBST([AR])
+
+dnl Fetch c-ares version from ares_version.h
+VERSION=`$SED -ne 's/^#define ARES_VERSION_STR "\(.*\)"/\1/p' ${srcdir}/ares_version.h`
+AM_INIT_AUTOMAKE([c-ares], [$VERSION])
+AC_MSG_CHECKING([c-ares version])
+AC_MSG_RESULT([$VERSION])
 
 dnl
 dnl Detect the canonical host and target build environment
@@ -13,10 +64,18 @@ AC_CANONICAL_HOST
 dnl Get system canonical name
 AC_DEFINE_UNQUOTED(OS, "${host}", [cpu-machine-OS])
 
-AC_AIX
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
+
+dnl This defines _ALL_SOURCE for AIX
+CARES_CHECK_AIX_ALL_SOURCE
+
+dnl Our configure and build reentrant settings
+CARES_CONFIGURE_REENTRANT
+
+dnl check for how to do large files
+AC_SYS_LARGEFILE
 
 case $host_os in
   solaris*)
@@ -54,15 +113,6 @@ AC_HELP_STRING([--disable-debug],[Disable debug options]),
     CPPFLAGS="$CPPFLAGS -DCURLDEBUG -I$srcdir/../include"
     CFLAGS="$CFLAGS -g" 
 
-    dnl check for how to do large files, needed to get the curl_off_t check
-    dnl done right
-    AC_SYS_LARGEFILE
-
-    AC_CHECK_SIZEOF(curl_off_t, ,[
-#include <stdio.h>
-#include "$srcdir/../include/curl/curl.h"
-    ])
-
     dnl set compiler "debug" options to become more picky, and remove
     dnl optimize options from CFLAGS
     CURL_CC_DEBUG_OPTS
@@ -72,6 +122,7 @@ AC_HELP_STRING([--disable-debug],[Disable debug options]),
        AC_MSG_RESULT(no)
 )
 AM_CONDITIONAL(DEBUGBUILD, test x$debugbuild = xyes)
+AM_CONDITIONAL(CURLDEBUG, test x$debugbuild = xyes)
 
 dnl skip libtool C++ and Fortran compiler checks
 m4_ifdef([AC_PROG_CXX], [m4_undefine([AC_PROG_CXX])])
@@ -124,28 +175,6 @@ dnl **********************************************************************
 CURL_DETECT_ICC([CFLAGS="$CFLAGS -we 147"])
 
 dnl **********************************************************************
-dnl Make sure that our checks for headers windows.h winsock.h winsock2.h 
-dnl and ws2tcpip.h take precedence over any other further checks which 
-dnl could be done later using AC_CHECK_HEADER or AC_CHECK_HEADERS for
-dnl this specific header files. And do them before its results are used.
-dnl **********************************************************************
-
-CURL_CHECK_HEADER_WINDOWS
-CURL_CHECK_NATIVE_WINDOWS
-case X-"$ac_cv_native_windows" in
-  X-yes)
-    CURL_CHECK_HEADER_WINSOCK
-    CURL_CHECK_HEADER_WINSOCK2
-    CURL_CHECK_HEADER_WS2TCPIP
-    ;;
-  *)
-    ac_cv_header_winsock_h="no"
-    ac_cv_header_winsock2_h="no"
-    ac_cv_header_ws2tcpip_h="no"
-    ;;
-esac
-
-dnl **********************************************************************
 dnl platform/compiler/architecture specific checks/flags
 dnl **********************************************************************
 
@@ -180,6 +209,73 @@ case $host in
     fi
     ;;
   #
+esac
+
+AC_MSG_CHECKING([whether we are using the IBM C compiler])
+CURL_CHECK_DEF([__IBMC__], [], [silent])
+if test "$curl_cv_have_def___IBMC__" = "yes"; then
+  AC_MSG_RESULT([yes])
+  dnl Ensure that compiler optimizations are always thread-safe.
+  CFLAGS="$CFLAGS -qthreaded"
+  dnl Disable type based strict aliasing optimizations, using worst
+  dnl case aliasing assumptions when compiling. Type based aliasing
+  dnl would restrict the lvalues that could be safely used to access
+  dnl a data object.
+  CFLAGS="$CFLAGS -qnoansialias"
+  dnl Force compiler to stop after the compilation phase, without
+  dnl generating an object code file when compilation has errors.
+  CFLAGS="$CFLAGS -qhalt=e"
+else
+  AC_MSG_RESULT([no])
+fi
+
+AC_MSG_CHECKING([whether we are using the DEC/Compaq C compiler])
+CURL_CHECK_DEF([__DECC], [], [silent])
+CURL_CHECK_DEF([__DECC_VER], [], [silent])
+if test "$curl_cv_have_def___DECC" = "yes" &&
+  test "$curl_cv_have_def___DECC_VER" = "yes"; then
+  AC_MSG_RESULT([yes])
+  dnl Select strict ANSI C compiler mode
+  CFLAGS="$CFLAGS -std1"
+  dnl Turn off optimizer ANSI C aliasing rules
+  CFLAGS="$CFLAGS -noansi_alias"
+  dnl Select a higher warning level than default level2
+  CFLAGS="$CFLAGS -msg_enable level3"
+  dnl Generate warnings for missing function prototypes
+  CFLAGS="$CFLAGS -warnprotos"
+  dnl Change some warnings into fatal errors
+  CFLAGS="$CFLAGS -msg_fatal toofewargs,toomanyargs"
+else
+  AC_MSG_RESULT([no])
+fi
+
+CURL_CHECK_COMPILER_HALT_ON_ERROR
+CURL_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE
+
+dnl **********************************************************************
+dnl Compilation based checks should not be done before this point.
+dnl **********************************************************************
+
+dnl **********************************************************************
+dnl Make sure that our checks for headers windows.h winsock.h winsock2.h 
+dnl and ws2tcpip.h take precedence over any other further checks which 
+dnl could be done later using AC_CHECK_HEADER or AC_CHECK_HEADERS for
+dnl this specific header files. And do them before its results are used.
+dnl **********************************************************************
+
+CURL_CHECK_HEADER_WINDOWS
+CURL_CHECK_NATIVE_WINDOWS
+case X-"$ac_cv_native_windows" in
+  X-yes)
+    CURL_CHECK_HEADER_WINSOCK
+    CURL_CHECK_HEADER_WINSOCK2
+    CURL_CHECK_HEADER_WS2TCPIP
+    ;;
+  *)
+    ac_cv_header_winsock_h="no"
+    ac_cv_header_winsock2_h="no"
+    ac_cv_header_ws2tcpip_h="no"
+    ;;
 esac
 
 dnl **********************************************************************
@@ -415,26 +511,6 @@ if test "x$RECENTAIX" = "xyes"; then
 
   AC_DEFINE(_THREAD_SAFE, 1, [define this if you need it to compile thread-safe code])
 
-  dnl check if this is the IBM xlc compiler
-  dnl Details thanks to => http://predef.sourceforge.net/
-  AC_MSG_CHECKING([if this is the xlc compiler])
-  AC_EGREP_CPP([^__xlC__], [__xlC__],
-         dnl action if the text is found, this it has not been replaced by the
-         dnl cpp
-         XLC="no"
-         AC_MSG_RESULT([no]),
-         dnl the text was not found, it was replaced by the cpp
-         XLC="yes"
-         AC_MSG_RESULT([yes])
-         CFLAGS="$CFLAGS -qthreaded"
-         dnl AIX xlc has to have strict aliasing turned off. If not,
-         dnl the optimizer assumes that pointers can only point to
-         dnl an object of the same type.
-         CFLAGS="$CFLAGS -qnoansialias"
-         dnl Force AIX xlc to stop after the compilation phase, and not
-         dnl generate object code, when the source compiles with errors.
-         CFLAGS="$CFLAGS -qhalt=e"
-       )
 fi
 
 
@@ -506,7 +582,8 @@ AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(time_t)
 
 AC_CHECK_TYPE(long long,
-   [AC_DEFINE(HAVE_LONGLONG, 1, [if your compiler supports long long])]
+   [AC_DEFINE(HAVE_LONGLONG, 1,
+     [Define to 1 if the compiler supports the 'long long' data type.])]
    longlong="yes"  
 )
 
@@ -549,9 +626,8 @@ TYPE_SIG_ATOMIC_T
 AC_TYPE_SIGNAL
 
 CURL_CHECK_FUNC_RECV
-
+CURL_CHECK_FUNC_RECVFROM
 CURL_CHECK_FUNC_SEND
-
 CURL_CHECK_MSG_NOSIGNAL
 
 dnl check for AF_INET6
@@ -720,23 +796,27 @@ AC_CHECK_MEMBER(struct addrinfo.ai_flags,
 )
 
 
-AC_CHECK_FUNCS( bitncmp \
-                gettimeofday \
-                if_indextoname,
-dnl if found
-[],
-dnl if not found, $ac_func is the name we check for
-func="$ac_func"
-AC_MSG_CHECKING([deeper for $func])
-AC_TRY_LINK( [],
-             [ $func ();],
-             AC_MSG_RESULT(yes!)
-             eval "ac_cv_func_$func=yes"
-             def=`echo "HAVE_$func" | tr 'a-z' 'A-Z'`
-             AC_DEFINE_UNQUOTED($def, 1, [If you have $func]),
-             AC_MSG_RESULT(but still no)
-             )
-)
+AC_CHECK_FUNCS([bitncmp \
+  gettimeofday \
+  if_indextoname
+],[
+],[
+  func="$ac_func"
+  AC_MSG_CHECKING([deeper for $func])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+    ]],[[
+      $func ();
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    eval "ac_cv_func_$func=yes"
+    AC_DEFINE_UNQUOTED([AS_TR_CPP([HAVE_$func])], [1],
+      [Define to 1 if you have the $func function.])
+  ],[
+    AC_MSG_RESULT([but still no])
+  ])
+])
 
 
 dnl check for inet_pton
@@ -929,6 +1009,9 @@ if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
         AC_DEFINE_UNQUOTED(RANDOM_FILE, "$RANDOM_FILE",
         [a suitable file/device to read random data from])
 fi
+
+CARES_PRIVATE_LIBS="$LIBS"
+AC_SUBST(CARES_PRIVATE_LIBS)
 
 AC_CONFIG_FILES([Makefile libcares.pc])
 AC_OUTPUT

@@ -1,5 +1,5 @@
 #################################################################
-# $Id: Makefile.netware,v 1.40 2008-02-27 01:43:12 gknauf Exp $
+# $Id: Makefile.netware,v 1.47 2008-08-10 00:39:45 yangtse Exp $
 #
 ## Makefile for building libcares (NetWare version - gnu make)
 ## Use: make -f Makefile.netware
@@ -75,7 +75,7 @@ MKDIR	= mkdir
 MPKXDC	= mkxdc
 
 # Global flags for all compilers
-CFLAGS	= $(OPT) -D$(DB) -DNETWARE -DHAVE_CONFIG_H -nostdinc
+CFLAGS	+= $(OPT) -D$(DB) -DNETWARE -DHAVE_CONFIG_H -nostdinc
 
 ifeq ($(CC),mwccnlm)
 LD	= mwldnlm
@@ -282,13 +282,19 @@ config.h: Makefile.netware
 	@echo $(DL)#define PACKAGE_BUGREPORT "a suitable curl mailing list => http://curl.haxx.se/mail/"$(DL) >> $@
 ifeq ($(LIBARCH),CLIB)
 	@echo $(DL)#define OS "i586-pc-clib-NetWare"$(DL) >> $@
-	@echo $(DL)#define MAXHOSTNAMELEN 256$(DL) >> $@
 	@echo $(DL)#define NETDB_USE_INTERNET 1$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_ARG1 int$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_ARG2 char *$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_ARG3 int$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_ARG4 int$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_RETV int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG1 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG2 char$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG3 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG4 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG5 struct sockaddr$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG6 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_RETV int$(DL) >> $@
 	@echo $(DL)#define SEND_QUAL_ARG2$(DL) >> $@
 	@echo $(DL)#define SEND_TYPE_ARG1 int$(DL) >> $@
 	@echo $(DL)#define SEND_TYPE_ARG2 char *$(DL) >> $@
@@ -325,6 +331,14 @@ else
 	@echo $(DL)#define RECV_TYPE_ARG3 size_t$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_ARG4 int$(DL) >> $@
 	@echo $(DL)#define RECV_TYPE_RETV ssize_t$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG1 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG2 void$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG3 size_t$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG4 int$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG5 struct sockaddr$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG6 size_t$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_RETV ssize_t$(DL) >> $@
+	@echo $(DL)#define RECVFROM_TYPE_ARG2_IS_VOID 1$(DL) >> $@
 	@echo $(DL)#define SEND_QUAL_ARG2$(DL) >> $@
 	@echo $(DL)#define SEND_TYPE_ARG1 int$(DL) >> $@
 	@echo $(DL)#define SEND_TYPE_ARG2 void *$(DL) >> $@
@@ -350,6 +364,7 @@ endif
 	@echo $(DL)#define HAVE_MALLOC_H 1$(DL) >> $@
 	@echo $(DL)#define HAVE_NETINET_IN_H 1$(DL) >> $@
 	@echo $(DL)#define HAVE_RECV 1$(DL) >> $@
+	@echo $(DL)#define HAVE_RECVFROM 1$(DL) >> $@
 	@echo $(DL)#define HAVE_SELECT 1$(DL) >> $@
 	@echo $(DL)#define HAVE_SEND 1$(DL) >> $@
 	@echo $(DL)#define HAVE_SETJMP_H 1$(DL) >> $@
@@ -373,7 +388,6 @@ endif
 	@echo $(DL)#define HAVE_UTIME 1$(DL) >> $@
 	@echo $(DL)#define HAVE_UTIME_H 1$(DL) >> $@
 	@echo $(DL)#define RETSIGTYPE void$(DL) >> $@
-	@echo $(DL)#define SIZEOF_CURL_OFF_T 4$(DL) >> $@
 	@echo $(DL)#define SIZEOF_STRUCT_IN_ADDR 4$(DL) >> $@
 	@echo $(DL)#define STDC_HEADERS 1$(DL) >> $@
 	@echo $(DL)#define TIME_WITH_SYS_TIME 1$(DL) >> $@

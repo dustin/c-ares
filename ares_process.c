@@ -1,4 +1,4 @@
-/* $Id: ares_process.c,v 1.64 2008-05-15 22:57:33 yangtse Exp $ */
+/* $Id: ares_process.c,v 1.67 2008-08-26 03:08:27 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  * Copyright (C) 2004-2008 by Daniel Stenberg
@@ -133,13 +133,11 @@ int ares__timeadd(struct timeval *now,
 }
 
 /* return time offset between now and (future) check, in milliseconds */
-int ares__timeoffset(struct timeval *now,
-                     struct timeval *check)
+long ares__timeoffset(struct timeval *now,
+                      struct timeval *check)
 {
-  int secs = (check->tv_sec - now->tv_sec); /* this many seconds */
-  int us = (check->tv_usec - now->tv_usec); /* this many microseconds */
-
-  return secs*1000 + us/1000; /* return them combined as milliseconds */
+  return (check->tv_sec - now->tv_sec)*1000 +
+         (check->tv_usec - now->tv_usec)/1000;
 }
 
 
@@ -431,6 +429,10 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
   int i;
   ssize_t count;
   unsigned char buf[PACKETSZ + 1];
+#ifdef HAVE_RECVFROM
+  struct sockaddr_in from;
+  socklen_t fromlen;
+#endif
 
   if(!read_fds && (read_fd == ARES_SOCKET_BAD))
     /* no possible action */
@@ -464,11 +466,24 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
       /* To reduce event loop overhead, read and process as many
        * packets as we can. */
       do {
+#ifdef HAVE_RECVFROM
+        fromlen = sizeof(from);
+        count = (ssize_t)recvfrom(server->udp_socket, (void *)buf, sizeof(buf),
+                                  0, (struct sockaddr *)&from, &fromlen);
+#else
         count = sread(server->udp_socket, buf, sizeof(buf));
+#endif
         if (count == -1 && try_again(SOCKERRNO))
           continue;
         else if (count <= 0)
           handle_error(channel, i, now);
+#ifdef HAVE_RECVFROM
+        else if (from.sin_addr.s_addr != server->addr.s_addr)
+          /* Address response came from did not match the address
+           * we sent the request to.  Someone may be attempting
+           * to perform a cache poisoning attack */
+          break;
+#endif
         else
           process_answer(channel, buf, (int)count, i, 0, now);
        } while (count > 0);

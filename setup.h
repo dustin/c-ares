@@ -1,9 +1,9 @@
 #ifndef __ARES_SETUP_H
 #define __ARES_SETUP_H
 
-/* $Id: setup.h,v 1.28 2007-11-08 18:13:54 yangtse Exp $ */
+/* $Id: setup.h,v 1.32 2008-07-30 08:27:02 yangtse Exp $ */
 
-/* Copyright (C) 2004 - 2007 by Daniel Stenberg et al
+/* Copyright (C) 2004 - 2008 by Daniel Stenberg et al
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -38,6 +38,18 @@
 #endif
 
 #endif /* HAVE_CONFIG_H */
+
+/*
+ * Tru64 needs _REENTRANT set for a few function prototypes and
+ * things to appear in the system header files. Unixware needs it
+ * to build proper reentrant code. Others may also need it.
+ */
+
+#ifdef NEED_REENTRANT
+#  ifndef _REENTRANT
+#    define _REENTRANT
+#  endif
+#endif
 
 /*
  * Include header files for windows builds before redefining anything.

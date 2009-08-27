@@ -48,8 +48,8 @@ DIST_COMMON = README $(am__configure_deps) $(libcares_la_HEADERS) \
 	mkinstalldirs
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/cares-reentrant.m4 \
+	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -94,7 +94,7 @@ adig_DEPENDENCIES = $(top_builddir)/$(lib_LTLIBRARIES)
 am_ahost_OBJECTS = ahost.$(OBJEXT) ares_getopt.$(OBJEXT)
 ahost_OBJECTS = $(am_ahost_OBJECTS)
 ahost_DEPENDENCIES = $(top_builddir)/$(lib_LTLIBRARIES)
-DEFAULT_INCLUDES = -I. -I$(srcdir) -I.
+DEFAULT_INCLUDES = 
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -139,11 +139,14 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+CARES_PRIVATE_LIBS = @CARES_PRIVATE_LIBS@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CURLDEBUG_FALSE = @CURLDEBUG_FALSE@
+CURLDEBUG_TRUE = @CURLDEBUG_TRUE@
 CYGPATH_W = @CYGPATH_W@
 DEBUGBUILD_FALSE = @DEBUGBUILD_FALSE@
 DEBUGBUILD_TRUE = @DEBUGBUILD_TRUE@
@@ -234,7 +237,30 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-AUTOMAKE_OPTIONS = foreign
+AUTOMAKE_OPTIONS = foreign nostdinc
+ACLOCAL_AMFLAGS = -I m4
+@CURLDEBUG_FALSE@INCLUDES = -I$(top_builddir) \
+@CURLDEBUG_FALSE@           -I$(top_srcdir)
+
+
+# Specify our include paths here, and do it relative to $(top_srcdir) and
+# $(top_builddir), to ensure that these paths which belong to the library
+# being currently built and tested are searched before the library which
+# might possibly already be installed in the system.
+#
+# When using the low-level hard-hacking memory leak tracking code from
+# libcurl the generated curl/curlbuild.h file must also be reachable.
+# Using the libcurl lowlevel code from within c-ares library is ugly and
+# only works when c-ares is built and linked with a similarly debug-build
+# libcurl, but we do this anyway for convenience.
+#
+# $(top_builddir)/../include is for libcurl's generated curl/curlbuild.h file
+# $(top_builddir) is for c-ares's generated config.h file
+# $(top_srcdir) is for c-ares's lib/setup.h and other "c-ares-private" files
+@CURLDEBUG_TRUE@INCLUDES = -I$(top_builddir)/../include \
+@CURLDEBUG_TRUE@           -I$(top_builddir)            \
+@CURLDEBUG_TRUE@           -I$(top_srcdir)
+
 lib_LTLIBRARIES = libcares.la
 man_MANS = $(MANPAGES)
 MSVCFILES = vc/vc.dsw vc/acountry/acountry.dsp vc/adig/adig.dsp \
@@ -628,7 +654,7 @@ distclean-tags:
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/. $(distdir)/vc $(distdir)/vc/acountry $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
+	$(mkdir_p) $(distdir)/. $(distdir)/m4 $(distdir)/vc $(distdir)/vc/acountry $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
