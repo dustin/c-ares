@@ -13,11 +13,12 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_process.c,v 1.3 1998/08/22 15:28:33 ghudson Exp $";
+static const char rcsid[] = "$Id: ares_process.c,v 1.5 2000/02/17 18:27:27 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <string.h>
 #include <stdlib.h>
@@ -249,10 +250,11 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
 /* If any queries have timed out, note the timeout and move them on. */
 static void process_timeouts(ares_channel channel, time_t now)
 {
-  struct query *query;
+  struct query *query, *next;
 
-  for (query = channel->queries; query; query = query->next)
+  for (query = channel->queries; query; query = next)
     {
+      next = query->next;
       if (query->timeout != 0 && now >= query->timeout)
 	{
 	  query->error_status = ARES_ETIMEOUT;
