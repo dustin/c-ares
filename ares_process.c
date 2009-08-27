@@ -1,7 +1,7 @@
-/* $Id: ares_process.c,v 1.73 2008-12-04 12:53:03 bagder Exp $ */
+/* $Id: ares_process.c,v 1.77 2009-06-19 00:41:03 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
- * Copyright (C) 2004-2008 by Daniel Stenberg
+ * Copyright (C) 2004-2009 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -104,7 +104,7 @@ static void end_query(ares_channel channel, struct query *query, int status,
 int ares__timedout(struct timeval *now,
                    struct timeval *check)
 {
-  int secs = (now->tv_sec - check->tv_sec);
+  long secs = (now->tv_sec - check->tv_sec);
 
   if(secs > 0)
     return 1; /* yes, timed out */
@@ -429,7 +429,7 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
   unsigned char buf[PACKETSZ + 1];
 #ifdef HAVE_RECVFROM
   struct sockaddr_in from;
-  socklen_t fromlen;
+  ares_socklen_t fromlen;
 #endif
 
   if(!read_fds && (read_fd == ARES_SOCKET_BAD))
@@ -715,6 +715,7 @@ void ares__send_query(ares_channel channel, struct query *query,
 {
   struct send_request *sendreq;
   struct server_state *server;
+  int timeplus;
 
   server = &channel->servers[query->server];
   if (query->using_tcp)
@@ -778,9 +779,11 @@ void ares__send_query(ares_channel channel, struct query *query,
           return;
         }
     }
+    timeplus = channel->timeout << (query->try / channel->nservers);
+    timeplus = (timeplus * (9 + (rand () & 7))) / 16;
     query->timeout = *now;
     ares__timeadd(&query->timeout,
-                  channel->timeout << (query->try / channel->nservers));
+                  timeplus);
     /* Keep track of queries bucketed by timeout, so we can process
      * timeout events quickly.
      */
@@ -893,7 +896,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   /* Configure it. */
   if (configure_socket(s, channel) < 0)
     {
-       closesocket(s);
+       sclose(s);
        return -1;
     }
 
@@ -908,7 +911,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
                  (void *)&opt, sizeof(opt)) == -1)
     {
-       closesocket(s);
+       sclose(s);
        return -1;
     }
 #endif
@@ -924,7 +927,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
 
       if (err != EINPROGRESS && err != EWOULDBLOCK)
         {
-          closesocket(s);
+          sclose(s);
           return -1;
         }
     }
@@ -935,7 +938,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
                                         channel->sock_create_cb_data);
       if (err < 0)
         {
-          closesocket(s);
+          sclose(s);
           return err;
         }
     }
@@ -960,7 +963,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
   /* Set the socket non-blocking. */
   if (configure_socket(s, channel) < 0)
     {
-       closesocket(s);
+       sclose(s);
        return -1;
     }
 
@@ -975,7 +978,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
 
       if (err != EINPROGRESS && err != EWOULDBLOCK)
         {
-          closesocket(s);
+          sclose(s);
           return -1;
         }
     }
@@ -986,7 +989,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
                                         channel->sock_create_cb_data);
       if (err < 0)
         {
-          closesocket(s);
+          sclose(s);
           return err;
         }
     }

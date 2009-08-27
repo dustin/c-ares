@@ -1,5 +1,97 @@
   Changelog for the c-ares project
 
+* 3 Aug 2009 (Daniel Stenberg)
+- Joshua Kwan fixed the init routine to fill in the defaults for stuff that
+  fails to get inited by other means. This fixes a case of when the c-ares
+  init fails when internet access is fone.
+
+- Timo Teras changed the reason code used in the resolve callback done when
+  ares_cancel() is used, to be ARES_ECANCELLED instead of ARES_ETIMEOUT to
+  better allow the callback to know what's happening.
+
+* 14 Jul 2009 (Guenter Knauf)
+- renamed generated config.h to ares_config.h to avoid any future clashes
+  with config.h from other projects.
+  
+* June 8 2009 (Yang Tse)
+- Removed buildconf.bat from release and daily snapshot archives. This
+  file is only for CVS tree checkout builds.
+
+* May 26 2009 (Yang Tse)
+- Added --enable-curldebug configure option to enable and disable building
+  with the low-level curl debug memory tracking 'feature' to allow decoupled
+  setting from --enable-debug, allowing again to build c-ares independently
+  out of the CVS tree.
+
+  For the c-ares library option --enable-debug enables debug build features
+  which are _not_ related with memory tracking. For the c-ares library when
+  --enable-debug is given it does not enable the memory tracking feature. If
+  you wish to enable the curl debug memory tracking you must use configure
+  option --enable-curldebug explicitily to do so.
+
+  Internally, definition of preprocessor symbol DEBUGBUILD restricts code
+  which is only compiled for debug enabled builds. And symbol CURLDEBUG is
+  used to differentiate code which is _only_ used for memory tracking.
+
+* May 19 2009 (Yang Tse)
+- Introduced ares_library_init() and ares_library_cleanup() functions.
+
+  This is an API and ABI break for Win32/64 systems. Non-Win32/64 build targets
+  using c-ares 1.6.1 can still survive without calling these functions. Read all
+  the details on ares_library_init(3) and ares_library_cleanup(3) man pages that
+  are included.
+
+  curl/libcurl 7.19.5 is fully compatible with c-ares 1.6.1 on all systems.
+
+  In order to use c-ares 1.6.1 with curl/libcurl on Win32/64 systems it is
+  required that curl/libcurl is 7.19.5 or newer. In other words, it is not
+  possible on Win32/64 to use c-ares 1.6.1 with a curl/libcurl version less
+  than 7.19.5
+
+* May 11 2009 (Daniel Stenberg)
+- Gregor Jasny made c-ares link with libtool 's -export-symbols-regex option to
+  only expose functions starting with ares_.
+
+* May 2 2009 (Yang Tse)
+- Use a build-time configured ares_socklen_t data type instead of socklen_t.
+
+* April 21 2009 (Yang Tse)
+- Moved potential inclusion of system's malloc.h and memory.h header files to
+  setup_once.h.  Inclusion of each header file is based on the definition of
+  NEED_MALLOC_H and NEED_MEMORY_H respectively.
+
+* March 11 2009 (Yang Tse)
+- Japheth Cleaver fixed acountry.c replacing u_long with unsigned long.
+
+* February 20 2009 (Yang Tse)
+- Do not halt compilation when using VS2008 to build a Windows 2000 target.
+
+* February 3 2009 (Phil Blundell)
+- If the server returns garbage or nothing at all in response to an AAAA query,
+  go on and ask for A records anyway.
+
+* January 31 2009 (Daniel Stenberg)
+- ares_gethostbyname() now accepts 'AF_UNSPEC' as a family for resolving
+  either AF_INET6 or AF_INET. It works by accepting any of the looksups in the
+  hosts file, and it resolves the AAAA field with a fallback to A.
+
+* January 14 2009 (Daniel Stenberg)
+- ares.h no longer uses the HAVE_STRUCT_IN6_ADDR define check, but instead it
+  now declares the private struct ares_in6_addr for all systems instead of
+  relying on one possibly not present in the system.
+
+* January 13 2009 (Phil Blundell)
+- ares__send_query() now varies the retry timeout pseudo-randomly to avoid
+  packet storms when several queries were started at the same time.
+
+* January 11 2009 (Daniel Stenberg)
+- Phil Blundell added the internal function ares__expand_name_for_response()
+  that is now used by the ares_parse_*_reply() functions instead of the
+  ares_expand_name() simply to easier return ARES_EBADRESP for the cases where
+  the name expansion fails as in responses that really isn't expected.
+
+Version 1.6.0 (Dec 9, 2008)
+
 * December 9 2008 (Gisle Vanem)
 
   Fixes for Win32 targets using the Watt-32 tcp/ip stack.

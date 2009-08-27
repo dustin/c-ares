@@ -1,18 +1,19 @@
 AC_PREREQ(2.57)
 
 dnl Version not hardcoded here. Fetched later from ares_version.h
-AC_INIT([c-ares], [1.6.0],
+AC_INIT([c-ares], [-],
   [c-ares mailing list => http://cool.haxx.se/mailman/listinfo/c-ares])
 
 CARES_OVERRIDE_AUTOCONF
 
 AC_CONFIG_SRCDIR([ares_ipv6.h])
-AM_CONFIG_HEADER([config.h])
+AM_CONFIG_HEADER([ares_config.h ares_build.h])
 AM_MAINTAINER_MODE
 
 CARES_CHECK_OPTION_DEBUG
 CARES_CHECK_OPTION_OPTIMIZE
 CARES_CHECK_OPTION_WARNINGS
+CARES_CHECK_OPTION_CURLDEBUG
 
 CARES_CHECK_PATH_SEPARATOR
 
@@ -94,11 +95,6 @@ esac
 dnl support building of Windows DLLs
 AC_LIBTOOL_WIN32_DLL
 
-CARES_PROCESS_DEBUG_BUILD_OPTS
-
-AM_CONDITIONAL(DEBUGBUILD, test x$want_debug = xyes)
-AM_CONDITIONAL(CURLDEBUG, test x$want_debug = xyes)
-
 dnl force libtool to build static libraries with PIC on AMD64-Linux & FreeBSD
 AC_MSG_CHECKING([if arch-OS host is AMD64-Linux/FreeBSD (to build static libraries with PIC)])
 case $host in
@@ -113,18 +109,6 @@ esac
 
 dnl libtool setup
 AC_PROG_LIBTOOL
-
-AC_MSG_CHECKING([if we need -no-undefined])
-case $host in
-  *-*-cygwin* | *-*-mingw* | *-*-pw32* | *-*-cegcc*)
-    need_no_undefined=yes
-    ;;
-  *)
-    need_no_undefined=no
-    ;;
-esac
-AC_MSG_RESULT($need_no_undefined)
-AM_CONDITIONAL(NO_UNDEFINED, test x$need_no_undefined = xyes)
 
 dnl **********************************************************************
 dnl platform/compiler/architecture specific checks/flags
@@ -158,8 +142,14 @@ case $host in
   #
 esac
 
-CURL_CHECK_COMPILER_HALT_ON_ERROR
-CURL_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE
+CARES_CHECK_COMPILER_HALT_ON_ERROR
+CARES_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE
+
+CARES_CHECK_NO_UNDEFINED
+AM_CONDITIONAL(NO_UNDEFINED, test x$need_no_undefined = xyes)
+
+CARES_CHECK_CURLDEBUG
+AM_CONDITIONAL(CURLDEBUG, test x$want_curldebug = xyes)
 
 dnl **********************************************************************
 dnl Compilation based checks should not be done before this point.
@@ -190,6 +180,8 @@ esac
 dnl **********************************************************************
 dnl Checks for libraries.
 dnl **********************************************************************
+
+CARES_CHECK_LIB_XNET
 
 dnl gethostbyname without lib or in the nsl lib?
 AC_CHECK_FUNC(gethostbyname,
@@ -345,8 +337,7 @@ if test "$ac_cv_lib_resolve_strcasecmp" = "$ac_cv_func_strcasecmp"; then
 fi
 ac_cv_func_strcasecmp="no"
 
-dnl socket lib?
-AC_CHECK_FUNC(connect, , [ AC_CHECK_LIB(socket, connect) ])
+CARES_CHECK_LIBS_CONNECT
 
 dnl **********************************************************************
 dnl In case that function clock_gettime with monotonic timer is available,
@@ -430,6 +421,7 @@ dnl Checks for header files.
 AC_HEADER_STDC
 
 CURL_CHECK_HEADER_MALLOC
+CURL_CHECK_HEADER_MEMORY
 
 dnl check for a few basic system headers we need
 AC_CHECK_HEADERS(
@@ -445,9 +437,11 @@ AC_CHECK_HEADERS(
        netinet/tcp.h \
        net/if.h \
        errno.h \
+       socket.h \
        strings.h \
        stdbool.h \
        time.h \
+       limits.h \
        arpa/nameser.h \
        arpa/nameser_compat.h \
        arpa/inet.h,
@@ -487,7 +481,9 @@ AC_HEADER_TIME
 CURL_CHECK_STRUCT_TIMEVAL
 
 AC_CHECK_SIZEOF(size_t)
+AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
+CARES_CONFIGURE_LONG
 AC_CHECK_SIZEOF(time_t)
 
 AC_CHECK_TYPE(long long,
@@ -523,8 +519,7 @@ AC_CHECK_TYPE([bool],[
 #endif
 ])
 
-# Check for socklen_t or equivalent
-CURL_CHECK_TYPE_SOCKLEN_T
+CARES_CONFIGURE_ARES_SOCKLEN_T
 
 TYPE_IN_ADDR_T
 
@@ -539,6 +534,9 @@ CURL_CHECK_FUNC_RECVFROM
 CURL_CHECK_FUNC_SEND
 CURL_CHECK_MSG_NOSIGNAL
 
+CARES_CHECK_FUNC_CLOSESOCKET
+CARES_CHECK_FUNC_CLOSESOCKET_CAMEL
+CARES_CHECK_FUNC_CONNECT
 CARES_CHECK_FUNC_FCNTL
 CARES_CHECK_FUNC_FREEADDRINFO
 CARES_CHECK_FUNC_GETADDRINFO
@@ -552,6 +550,7 @@ CARES_CHECK_FUNC_IOCTL
 CARES_CHECK_FUNC_IOCTLSOCKET
 CARES_CHECK_FUNC_IOCTLSOCKET_CAMEL
 CARES_CHECK_FUNC_SETSOCKOPT
+CARES_CHECK_FUNC_SOCKET
 CARES_CHECK_FUNC_STRCASECMP
 CARES_CHECK_FUNC_STRCMPI
 CARES_CHECK_FUNC_STRDUP
@@ -743,7 +742,7 @@ AC_CHECK_FUNCS([bitncmp \
   ],[
     AC_MSG_RESULT([yes])
     eval "ac_cv_func_$func=yes"
-    AC_DEFINE_UNQUOTED([AS_TR_CPP([HAVE_$func])], [1],
+    AC_DEFINE_UNQUOTED(AS_TR_CPP([HAVE_$func]), [1],
       [Define to 1 if you have the $func function.])
   ],[
     AC_MSG_RESULT([but still no])

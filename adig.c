@@ -1,6 +1,6 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
- * $Id: adig.c,v 1.36 2008-10-17 19:04:53 yangtse Exp $
+ * $Id: adig.c,v 1.39 2009-05-29 13:19:51 yangtse Exp $
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -82,6 +82,11 @@
 /* Mac OS X portability check */
 #ifndef T_SRV
 #define T_SRV 33 /* server selection */
+#endif
+
+/* AIX portability check */
+#ifndef T_NAPTR
+#define T_NAPTR 35 /* naming authority pointer */
 #endif
 
 struct nv {
@@ -187,6 +192,13 @@ int main(int argc, char **argv)
   WSAStartup(wVersionRequested, &wsaData);
 #endif
 
+  status = ares_library_init(ARES_LIB_INIT_ALL);
+  if (status != ARES_SUCCESS)
+    {
+      fprintf(stderr, "ares_library_init: %s\n", ares_strerror(status));
+      return 1;
+    }
+
   options.flags = ARES_FLAG_NOCHECKRESP;
   options.servers = NULL;
   options.nservers = 0;
@@ -207,9 +219,10 @@ int main(int argc, char **argv)
               if (strcmp(flags[i].name, optarg) == 0)
                 break;
             }
-          if (i == nflags)
+          if (i < nflags)
+            options.flags |= flags[i].value;
+          else
             usage();
-          options.flags |= flags[i].value;
           break;
 
         case 's':
@@ -244,9 +257,10 @@ int main(int argc, char **argv)
               if (strcasecmp(classes[i].name, optarg) == 0)
                 break;
             }
-          if (i == nclasses)
+          if (i < nclasses)
+            dnsclass = classes[i].value;
+          else
             usage();
-          dnsclass = classes[i].value;
           break;
 
         case 't':
@@ -256,9 +270,10 @@ int main(int argc, char **argv)
               if (strcasecmp(types[i].name, optarg) == 0)
                 break;
             }
-          if (i == ntypes)
+          if (i < ntypes)
+            type = types[i].value;
+          else
             usage();
-          type = types[i].value;
           break;
 
         case 'T':
@@ -324,6 +339,8 @@ int main(int argc, char **argv)
     }
 
   ares_destroy(channel);
+
+  ares_library_cleanup();
 
 #ifdef USE_WINSOCK
   WSACleanup();

@@ -1,7 +1,7 @@
 #***************************************************************************
-# $Id: cares-functions.m4,v 1.27 2008-11-20 07:59:26 danf Exp $
+# $Id: cares-functions.m4,v 1.32 2009-06-20 17:24:43 yangtse Exp $
 #
-# Copyright (C) 2008 by Daniel Stenberg et al
+# Copyright (C) 2008 - 2009 by Daniel Stenberg et al
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted, provided
@@ -16,7 +16,7 @@
 #***************************************************************************
 
 # File version for 'aclocal' use. Keep it a single number.
-# serial 26
+# serial 32
 
 
 dnl CARES_INCLUDES_ARPA_INET
@@ -88,6 +88,27 @@ cares_includes_netdb="\
   AC_CHECK_HEADERS(
     sys/types.h netdb.h,
     [], [], [$cares_includes_netdb])
+])
+
+
+dnl CARES_INCLUDES_SOCKET
+dnl -------------------------------------------------
+dnl Set up variable with list of headers that must be
+dnl included when socket.h is to be included.
+
+AC_DEFUN([CARES_INCLUDES_SOCKET], [
+cares_includes_socket="\
+/* includes start */
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
+#ifdef HAVE_SOCKET_H
+#  include <socket.h>
+#endif
+/* includes end */"
+  AC_CHECK_HEADERS(
+    sys/types.h socket.h,
+    [], [], [$cares_includes_socket])
 ])
 
 
@@ -187,6 +208,24 @@ cares_includes_sys_socket="\
 ])
 
 
+dnl CARES_INCLUDES_SYS_TYPES
+dnl -------------------------------------------------
+dnl Set up variable with list of headers that must be
+dnl included when sys/types.h is to be included.
+
+AC_DEFUN([CARES_INCLUDES_SYS_TYPES], [
+cares_includes_sys_types="\
+/* includes start */
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
+/* includes end */"
+  AC_CHECK_HEADERS(
+    sys/types.h,
+    [], [], [$cares_includes_sys_types])
+])
+
+
 dnl CARES_INCLUDES_SYS_UIO
 dnl -------------------------------------------------
 dnl Set up variable with list of headers that must be
@@ -281,6 +320,305 @@ cares_includes_ws2tcpip="\
   CURL_CHECK_HEADER_WINDOWS
   CURL_CHECK_HEADER_WINSOCK2
   CURL_CHECK_HEADER_WS2TCPIP
+])
+
+
+dnl CARES_PREPROCESS_CALLCONV
+dnl -------------------------------------------------
+dnl Set up variable with a preprocessor block which
+dnl defines function calling convention.
+
+AC_DEFUN([CARES_PREPROCESS_CALLCONV], [
+cares_preprocess_callconv="\
+/* preprocess start */
+#ifdef HAVE_WINDOWS_H
+#  define FUNCALLCONV __stdcall
+#else
+#  define FUNCALLCONV
+#endif
+/* preprocess end */"
+])
+
+
+dnl CARES_CHECK_FUNC_CLOSESOCKET
+dnl -------------------------------------------------
+dnl Verify if closesocket is available, prototyped, and
+dnl can be compiled. If all of these are true, and
+dnl usage has not been previously disallowed with
+dnl shell variable cares_disallow_closesocket, then
+dnl HAVE_CLOSESOCKET will be defined.
+
+AC_DEFUN([CARES_CHECK_FUNC_CLOSESOCKET], [
+  AC_REQUIRE([CARES_INCLUDES_WINSOCK2])dnl
+  AC_REQUIRE([CARES_INCLUDES_SOCKET])dnl
+  #
+  tst_links_closesocket="unknown"
+  tst_proto_closesocket="unknown"
+  tst_compi_closesocket="unknown"
+  tst_allow_closesocket="unknown"
+  #
+  AC_MSG_CHECKING([if closesocket can be linked])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      $cares_includes_winsock2
+      $cares_includes_socket
+    ]],[[
+      if(0 != closesocket(0))
+        return 1;
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    tst_links_closesocket="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    tst_links_closesocket="no"
+  ])
+  #
+  if test "$tst_links_closesocket" = "yes"; then
+    AC_MSG_CHECKING([if closesocket is prototyped])
+    AC_EGREP_CPP([closesocket],[
+      $cares_includes_winsock2
+      $cares_includes_socket
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_proto_closesocket="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_proto_closesocket="no"
+    ])
+  fi
+  #
+  if test "$tst_proto_closesocket" = "yes"; then
+    AC_MSG_CHECKING([if closesocket is compilable])
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
+        $cares_includes_winsock2
+        $cares_includes_socket
+      ]],[[
+        if(0 != closesocket(0))
+          return 1;
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_compi_closesocket="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_compi_closesocket="no"
+    ])
+  fi
+  #
+  if test "$tst_compi_closesocket" = "yes"; then
+    AC_MSG_CHECKING([if closesocket usage allowed])
+    if test "x$cares_disallow_closesocket" != "xyes"; then
+      AC_MSG_RESULT([yes])
+      tst_allow_closesocket="yes"
+    else
+      AC_MSG_RESULT([no])
+      tst_allow_closesocket="no"
+    fi
+  fi
+  #
+  AC_MSG_CHECKING([if closesocket might be used])
+  if test "$tst_links_closesocket" = "yes" &&
+     test "$tst_proto_closesocket" = "yes" &&
+     test "$tst_compi_closesocket" = "yes" &&
+     test "$tst_allow_closesocket" = "yes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED(HAVE_CLOSESOCKET, 1,
+      [Define to 1 if you have the closesocket function.])
+    ac_cv_func_closesocket="yes"
+  else
+    AC_MSG_RESULT([no])
+    ac_cv_func_closesocket="no"
+  fi
+])
+
+
+dnl CARES_CHECK_FUNC_CLOSESOCKET_CAMEL
+dnl -------------------------------------------------
+dnl Verify if CloseSocket is available, prototyped, and
+dnl can be compiled. If all of these are true, and
+dnl usage has not been previously disallowed with
+dnl shell variable cares_disallow_closesocket_camel,
+dnl then HAVE_CLOSESOCKET_CAMEL will be defined.
+
+AC_DEFUN([CARES_CHECK_FUNC_CLOSESOCKET_CAMEL], [
+  AC_REQUIRE([CARES_INCLUDES_SYS_SOCKET])dnl
+  #
+  tst_links_closesocket_camel="unknown"
+  tst_proto_closesocket_camel="unknown"
+  tst_compi_closesocket_camel="unknown"
+  tst_allow_closesocket_camel="unknown"
+  #
+  AC_MSG_CHECKING([if CloseSocket can be linked])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      $cares_includes_sys_socket
+    ]],[[
+      if(0 != CloseSocket(0))
+        return 1;
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    tst_links_closesocket_camel="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    tst_links_closesocket_camel="no"
+  ])
+  #
+  if test "$tst_links_closesocket_camel" = "yes"; then
+    AC_MSG_CHECKING([if CloseSocket is prototyped])
+    AC_EGREP_CPP([CloseSocket],[
+      $cares_includes_sys_socket
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_proto_closesocket_camel="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_proto_closesocket_camel="no"
+    ])
+  fi
+  #
+  if test "$tst_proto_closesocket_camel" = "yes"; then
+    AC_MSG_CHECKING([if CloseSocket is compilable])
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
+        $cares_includes_sys_socket
+      ]],[[
+        if(0 != CloseSocket(0))
+          return 1;
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_compi_closesocket_camel="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_compi_closesocket_camel="no"
+    ])
+  fi
+  #
+  if test "$tst_compi_closesocket_camel" = "yes"; then
+    AC_MSG_CHECKING([if CloseSocket usage allowed])
+    if test "x$cares_disallow_closesocket_camel" != "xyes"; then
+      AC_MSG_RESULT([yes])
+      tst_allow_closesocket_camel="yes"
+    else
+      AC_MSG_RESULT([no])
+      tst_allow_closesocket_camel="no"
+    fi
+  fi
+  #
+  AC_MSG_CHECKING([if CloseSocket might be used])
+  if test "$tst_links_closesocket_camel" = "yes" &&
+     test "$tst_proto_closesocket_camel" = "yes" &&
+     test "$tst_compi_closesocket_camel" = "yes" &&
+     test "$tst_allow_closesocket_camel" = "yes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED(HAVE_CLOSESOCKET_CAMEL, 1,
+      [Define to 1 if you have the CloseSocket camel case function.])
+    ac_cv_func_closesocket_camel="yes"
+  else
+    AC_MSG_RESULT([no])
+    ac_cv_func_closesocket_camel="no"
+  fi
+])
+
+
+dnl CARES_CHECK_FUNC_CONNECT
+dnl -------------------------------------------------
+dnl Verify if connect is available, prototyped, and
+dnl can be compiled. If all of these are true, and
+dnl usage has not been previously disallowed with
+dnl shell variable cares_disallow_connect, then
+dnl HAVE_CONNECT will be defined.
+
+AC_DEFUN([CARES_CHECK_FUNC_CONNECT], [
+  AC_REQUIRE([CARES_INCLUDES_WINSOCK2])dnl
+  AC_REQUIRE([CARES_INCLUDES_SYS_SOCKET])dnl
+  AC_REQUIRE([CARES_INCLUDES_SOCKET])dnl
+  #
+  tst_links_connect="unknown"
+  tst_proto_connect="unknown"
+  tst_compi_connect="unknown"
+  tst_allow_connect="unknown"
+  #
+  AC_MSG_CHECKING([if connect can be linked])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      $cares_includes_winsock2
+      $cares_includes_sys_socket
+      $cares_includes_socket
+    ]],[[
+      if(0 != connect(0, 0, 0))
+        return 1;
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    tst_links_connect="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    tst_links_connect="no"
+  ])
+  #
+  if test "$tst_links_connect" = "yes"; then
+    AC_MSG_CHECKING([if connect is prototyped])
+    AC_EGREP_CPP([connect],[
+      $cares_includes_winsock2
+      $cares_includes_sys_socket
+      $cares_includes_socket
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_proto_connect="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_proto_connect="no"
+    ])
+  fi
+  #
+  if test "$tst_proto_connect" = "yes"; then
+    AC_MSG_CHECKING([if connect is compilable])
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
+        $cares_includes_winsock2
+        $cares_includes_sys_socket
+        $cares_includes_socket
+      ]],[[
+        if(0 != connect(0, 0, 0))
+          return 1;
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_compi_connect="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_compi_connect="no"
+    ])
+  fi
+  #
+  if test "$tst_compi_connect" = "yes"; then
+    AC_MSG_CHECKING([if connect usage allowed])
+    if test "x$cares_disallow_connect" != "xyes"; then
+      AC_MSG_RESULT([yes])
+      tst_allow_connect="yes"
+    else
+      AC_MSG_RESULT([no])
+      tst_allow_connect="no"
+    fi
+  fi
+  #
+  AC_MSG_CHECKING([if connect might be used])
+  if test "$tst_links_connect" = "yes" &&
+     test "$tst_proto_connect" = "yes" &&
+     test "$tst_compi_connect" = "yes" &&
+     test "$tst_allow_connect" = "yes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED(HAVE_CONNECT, 1,
+      [Define to 1 if you have the connect function.])
+    ac_cv_func_connect="yes"
+  else
+    AC_MSG_RESULT([no])
+    ac_cv_func_connect="no"
+  fi
 ])
 
 
@@ -2035,6 +2373,104 @@ AC_DEFUN([CARES_CHECK_FUNC_SETSOCKOPT_SO_NONBLOCK], [
   else
     AC_MSG_RESULT([no])
     ac_cv_func_setsockopt_so_nonblock="no"
+  fi
+])
+
+
+dnl CARES_CHECK_FUNC_SOCKET
+dnl -------------------------------------------------
+dnl Verify if socket is available, prototyped, and
+dnl can be compiled. If all of these are true, and
+dnl usage has not been previously disallowed with
+dnl shell variable cares_disallow_socket, then
+dnl HAVE_SOCKET will be defined.
+
+AC_DEFUN([CARES_CHECK_FUNC_SOCKET], [
+  AC_REQUIRE([CARES_INCLUDES_WINSOCK2])dnl
+  AC_REQUIRE([CARES_INCLUDES_SYS_SOCKET])dnl
+  AC_REQUIRE([CARES_INCLUDES_SOCKET])dnl
+  #
+  tst_links_socket="unknown"
+  tst_proto_socket="unknown"
+  tst_compi_socket="unknown"
+  tst_allow_socket="unknown"
+  #
+  AC_MSG_CHECKING([if socket can be linked])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      $cares_includes_winsock2
+      $cares_includes_sys_socket
+      $cares_includes_socket
+    ]],[[
+      if(0 != socket(0, 0, 0))
+        return 1;
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    tst_links_socket="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    tst_links_socket="no"
+  ])
+  #
+  if test "$tst_links_socket" = "yes"; then
+    AC_MSG_CHECKING([if socket is prototyped])
+    AC_EGREP_CPP([socket],[
+      $cares_includes_winsock2
+      $cares_includes_sys_socket
+      $cares_includes_socket
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_proto_socket="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_proto_socket="no"
+    ])
+  fi
+  #
+  if test "$tst_proto_socket" = "yes"; then
+    AC_MSG_CHECKING([if socket is compilable])
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
+        $cares_includes_winsock2
+        $cares_includes_sys_socket
+        $cares_includes_socket
+      ]],[[
+        if(0 != socket(0, 0, 0))
+          return 1;
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      tst_compi_socket="yes"
+    ],[
+      AC_MSG_RESULT([no])
+      tst_compi_socket="no"
+    ])
+  fi
+  #
+  if test "$tst_compi_socket" = "yes"; then
+    AC_MSG_CHECKING([if socket usage allowed])
+    if test "x$cares_disallow_socket" != "xyes"; then
+      AC_MSG_RESULT([yes])
+      tst_allow_socket="yes"
+    else
+      AC_MSG_RESULT([no])
+      tst_allow_socket="no"
+    fi
+  fi
+  #
+  AC_MSG_CHECKING([if socket might be used])
+  if test "$tst_links_socket" = "yes" &&
+     test "$tst_proto_socket" = "yes" &&
+     test "$tst_compi_socket" = "yes" &&
+     test "$tst_allow_socket" = "yes"; then
+    AC_MSG_RESULT([yes])
+    AC_DEFINE_UNQUOTED(HAVE_SOCKET, 1,
+      [Define to 1 if you have the socket function.])
+    ac_cv_func_socket="yes"
+  else
+    AC_MSG_RESULT([no])
+    ac_cv_func_socket="no"
   fi
 ])
 

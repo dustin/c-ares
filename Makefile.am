@@ -14,11 +14,13 @@ ACLOCAL_AMFLAGS = -I m4
 # libcurl, but we do this anyway for convenience.
 #
 # $(top_builddir)/../include is for libcurl's generated curl/curlbuild.h file
-# $(top_builddir) is for c-ares's generated config.h file
+# $(top_srcdir)/../include is for libcurl's external include files
+# $(top_builddir) is for c-ares's generated ares_config.h file
 # $(top_srcdir) is for c-ares's lib/setup.h and other "c-ares-private" files
 
 if CURLDEBUG
 INCLUDES = -I$(top_builddir)/../include \
+           -I$(top_srcdir)/../include   \
            -I$(top_builddir)            \
            -I$(top_srcdir)
 else
@@ -33,7 +35,7 @@ man_MANS = $(MANPAGES)
 MSVCFILES = vc/vc.dsw vc/acountry/acountry.dsp vc/adig/adig.dsp \
  vc/ahost/ahost.dsp vc/areslib/areslib.dsp vc/areslib/areslib.dsw
 
-if DEBUGBUILD
+if CURLDEBUG
 PROGS =
 else
 PROGS = ahost adig acountry
@@ -46,7 +48,11 @@ noinst_PROGRAMS =$(PROGS)
 EXTRA_DIST = AUTHORS CHANGES README.cares Makefile.inc Makefile.dj	   \
  Makefile.m32 Makefile.netware Makefile.vc6 $(man_MANS) $(MSVCFILES)	   \
  config-win32.h RELEASE-NOTES libcares.pc.in buildconf get_ver.awk maketgz \
- TODO
+ TODO ares_build.h.in $(PDFPAGES)
+
+CLEANFILES = $(PDFPAGES) $(HTMLPAGES)
+
+DISTCLEANFILES = ares_build.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libcares.pc
@@ -85,8 +91,9 @@ if NO_UNDEFINED
 UNDEF = -no-undefined
 endif
 
+# EXPORT_SYMBOLS = -export-symbols-regex '^ares_[[:alnum:]].*'
 
-libcares_la_LDFLAGS = $(UNDEF) $(VER)
+libcares_la_LDFLAGS = $(UNDEF) $(VER) $(EXPORT_SYMBOLS)
 
 # Makefile.inc provides the CSOURCES and HHEADERS defines
 include Makefile.inc
@@ -96,16 +103,56 @@ libcares_la_SOURCES = $(CSOURCES) $(HHEADERS)
 # where to install the c-ares headers
 libcares_ladir = $(includedir)
 # what headers to install on 'make install':
-libcares_la_HEADERS = ares.h ares_version.h ares_dns.h
+libcares_la_HEADERS = ares.h ares_version.h ares_dns.h \
+	ares_build.h ares_rules.h
 
 ahost_SOURCES = ahost.c ares_getopt.c ares_getopt.h
-ahost_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
+ahost_LDADD = $(top_builddir)/libcares.la
 
 adig_SOURCES = adig.c ares_getopt.c ares_getopt.h
-adig_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
+adig_LDADD = $(top_builddir)/libcares.la
 
 acountry_SOURCES = acountry.c ares_getopt.c ares_getopt.h
-acountry_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
+acountry_LDADD = $(top_builddir)/libcares.la
+
+SOURCEDMANDIR = man3
+SOURCEDMANPAGES = ares_init.3
+
+clean-local: clean-sourced-manpages
+
+clean-sourced-manpages:
+	@srcdmandir='$(SOURCEDMANDIR)'; \
+	echo "rm -rf $(top_builddir)/$$srcdmandir"; \
+	rm -rf $(top_builddir)/$$srcdmandir
+
+sourced-manpages: clean-sourced-manpages
+	@srcdmandir='$(SOURCEDMANDIR)'; \
+	srcdmanfiles='$(SOURCEDMANPAGES)'; \
+	mkdir $(top_builddir)/$$srcdmandir; \
+	for file in $$srcdmanfiles; do \
+	  if test -f $(top_srcdir)/$$file; then \
+	    echo "cp $(top_srcdir)/$$file $(top_builddir)/$$srcdmandir/$$file"; \
+	    cp $(top_srcdir)/$$file $(top_builddir)/$$srcdmandir/$$file; \
+	  fi; \
+	done
+
+MAN2HTML = roffit --mandir=. < $< >$@
+
+SUFFIXES = .3 .html
+
+html: sourced-manpages $(HTMLPAGES)
+
+.3.html:
+	$(MAN2HTML)
+
+pdf: sourced-manpages $(PDFPAGES)
+
+.3.pdf:
+	@(foo=`echo $@ | sed -e 's/\.[0-9]$$//g'`; \
+	groff -Tps -man $< >$$foo.ps; \
+	ps2pdf $$foo.ps $@; \
+	rm $$foo.ps; \
+	echo "converted $< to $@")
 
 # Make files named *.dist replace the file without .dist extension
 dist-hook:

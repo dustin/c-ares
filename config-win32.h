@@ -1,7 +1,7 @@
 #ifndef __ARES_CONFIG_WIN32_H
 #define __ARES_CONFIG_WIN32_H
 
-/* $Id: config-win32.h,v 1.28 2008-12-08 16:12:11 giva Exp $ */
+/* $Id: config-win32.h,v 1.30 2009-04-14 13:50:32 yangtse Exp $ */
 
 /* Copyright (C) 2004 - 2008 by Daniel Stenberg et al
  *
@@ -28,6 +28,9 @@
 #if defined(__MINGW32__)
 #define HAVE_GETOPT_H 1
 #endif
+
+/* Define if you have the <limits.h> header file.  */
+#define HAVE_LIMITS_H 1
 
 /* Define if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
@@ -223,17 +226,33 @@
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #endif
 
-/* VS2008 does not support Windows build targets prior to WinXP, */
-/* so, if no build target has been defined we will target WinXP. */
+/* Officially, Microsoft's Windows SDK versions 6.X do not support Windows
+   2000 as a supported build target. VS2008 default installations provide an
+   embedded Windows SDK v6.0A along with the claim that Windows 2000 is a
+   valid build target for VS2008. Popular belief is that binaries built using
+   Windows SDK versions 6.X and Windows 2000 as a build target are functional */
+#if defined(_MSC_VER) && (_MSC_VER >= 1500)
+#  define VS2008_MINIMUM_TARGET 0x0500
+#endif
+
+/* When no build target is specified VS2008 default build target is Windows
+   Vista, which leaves out even Winsows XP. If no build target has been given
+   for VS2008 we will target the minimum Officially supported build target,
+   which happens to be Windows XP. */
+#if defined(_MSC_VER) && (_MSC_VER >= 1500)
+#  define VS2008_DEFAULT_TARGET  0x0501
+#endif
+
+/* VS2008 default target settings and minimum build target check */
 #if defined(_MSC_VER) && (_MSC_VER >= 1500)
 #  ifndef _WIN32_WINNT
-#    define _WIN32_WINNT 0x0501
+#    define _WIN32_WINNT VS2008_DEFAULT_TARGET
 #  endif
 #  ifndef WINVER
-#    define WINVER 0x0501
+#    define WINVER VS2008_DEFAULT_TARGET
 #  endif
-#  if (_WIN32_WINNT < 0x0501) || (WINVER < 0x0501)
-#    error VS2008 does not support Windows build targets prior to WinXP
+#  if (_WIN32_WINNT < VS2008_MINIMUM_TARGET) || (WINVER < VS2008_MINIMUM_TARGET)
+#    error VS2008 does not support Windows build targets prior to Windows 2000
 #  endif
 #endif
 

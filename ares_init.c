@@ -1,7 +1,7 @@
-/* $Id: ares_init.c,v 1.87 2008-12-04 12:53:03 bagder Exp $ */
+/* $Id: ares_init.c,v 1.94 2009-08-03 11:29:17 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
- * Copyright (C) 2007-2008 by Daniel Stenberg
+ * Copyright (C) 2007-2009 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -20,7 +20,6 @@
 
 #if defined(WIN32) && !defined(WATT32)
 #include <iphlpapi.h>
-#include <malloc.h>
 #endif
 
 #ifdef HAVE_SYS_PARAM_H
@@ -68,6 +67,7 @@
 #include <errno.h>
 #include "ares.h"
 #include "inet_net_pton.h"
+#include "ares_library_init.h"
 #include "ares_private.h"
 
 #ifdef WATT32
@@ -128,6 +128,9 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   if (env)
     curl_memlimit(atoi(env));
 #endif
+
+  if (ares_library_initialized() != ARES_SUCCESS)
+    return ARES_ENOTINITIALIZED;
 
   channel = malloc(sizeof(struct ares_channeldata));
   if (!channel) {
@@ -198,12 +201,15 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
       DEBUGF(fprintf(stderr, "Error: init_by_resolv_conf failed: %s\n",
                      ares_strerror(status)));
   }
-  if (status == ARES_SUCCESS) {
-    status = init_by_defaults(channel);
-    if (status != ARES_SUCCESS)
-      DEBUGF(fprintf(stderr, "Error: init_by_defaults failed: %s\n",
-                     ares_strerror(status)));
-  }
+
+  /*
+   * No matter what failed or succeeded, seed defaults to provide
+   * useful behavior for things that we missed.
+   */
+  status = init_by_defaults(channel);
+  if (status != ARES_SUCCESS)
+    DEBUGF(fprintf(stderr, "Error: init_by_defaults failed: %s\n",
+                   ares_strerror(status)));
 
   /* Generate random key */
 
@@ -559,11 +565,8 @@ static int get_res_interfaces_nt(HKEY hKey, const char *subkey, char **obuf)
 
 static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
 {
-  FIXED_INFO    *fi   = alloca (sizeof(*fi));
+  FIXED_INFO    *fi, *newfi;
   DWORD          size = sizeof (*fi);
-  typedef DWORD (WINAPI* get_net_param_func) (FIXED_INFO*, DWORD*);
-  get_net_param_func fpGetNetworkParams;  /* available only on Win-98/2000+ */
-  HMODULE        handle;
   IP_ADDR_STRING *ipAddr;
   int            i, count = 0;
   int            debug  = 0;
@@ -572,23 +575,21 @@ static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
   char          *ret = ret_buf;
   HRESULT        res;
 
+  fi = malloc(size);
   if (!fi)
-     return (0);
-
-  handle = LoadLibrary ("iphlpapi.dll");
-  if (!handle)
-     return (0);
-
-  fpGetNetworkParams = (get_net_param_func) GetProcAddress (handle, "GetNetworkParams");
-  if (!fpGetNetworkParams)
-     goto quit;
+     return 0;
 
   res = (*fpGetNetworkParams) (fi, &size);
   if ((res != ERROR_BUFFER_OVERFLOW) && (res != ERROR_SUCCESS))
      goto quit;
 
-  fi = alloca (size);
-  if (!fi || (*fpGetNetworkParams) (fi, &size) != ERROR_SUCCESS)
+  newfi = realloc(fi, size);
+  if (!newfi)
+     goto quit;
+
+  fi = newfi;
+  res = (*fpGetNetworkParams) (fi, &size);
+  if (res != ERROR_SUCCESS)
      goto quit;
 
   if (debug)
@@ -621,14 +622,14 @@ static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
   }
 
 quit:
-  if (handle)
-     FreeLibrary (handle);
+  if (fi)
+     free(fi);
 
   if (debug && left <= ip_size)
      printf ("Too many nameservers. Truncating to %d addressess", count);
   if (ret > ret_buf)
      ret[-1] = '\0';
-  return (count);
+  return count;
 }
 #endif
 
@@ -1490,15 +1491,13 @@ static void randomize_key(unsigned char* key,int key_data_len)
   int randomized = 0;
   int counter=0;
 #ifdef WIN32
-  HMODULE lib=LoadLibrary("ADVAPI32.DLL");
-  if (lib) {
-    BOOLEAN (APIENTRY *pfn)(void*, ULONG) =
-      (BOOLEAN (APIENTRY *)(void*,ULONG))GetProcAddress(lib,"SystemFunction036");
-    if (pfn && pfn(key,key_data_len) )
-      randomized = 1;
-
-    FreeLibrary(lib);
-  }
+  BOOLEAN res;
+  if (fpSystemFunction036)
+    {
+      res = (*fpSystemFunction036) (key, key_data_len);
+      if (res)
+        randomized = 1;
+    }
 #else /* !WIN32 */
 #ifdef RANDOM_FILE
   FILE *f = fopen(RANDOM_FILE, "rb");

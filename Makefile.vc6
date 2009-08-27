@@ -1,4 +1,4 @@
-# $Id: Makefile.vc6,v 1.19 2008-12-08 16:09:21 giva Exp $
+# $Id: Makefile.vc6,v 1.26 2009-06-13 00:52:48 yangtse Exp $
 #
 # C-ares makefile for MSVC6+
 # G. Vanem <giva@bgnett.no>.
@@ -12,8 +12,8 @@ USE_WATT32  = 0
 # Configurations:
 #  -MD   - msvcrt.dll,  threads, release (normal)
 #  -MDd  - msvcrtd.dll, threads, debug
-#  -ML   - libc, no threads,     release
-#  -MLd  - libc, no threads,     debug
+#  -ML   - libc, no threads,     release (not available on VC-2008+)
+#  -MLd  - libc, no threads,     debug   (not available on VC-2008+)
 #  -MT   - libc, threads,        release
 #  -MTd  - libc, threads,        debug
 
@@ -26,7 +26,7 @@ OBJ_DIR  = VC6_obj
 DEF_FILE = cares.def
 
 !if "$(USE_WATT32)" == "1"
-CFLAGS  = $(CFLAGS) -UWIN32 -DWATT32 -D_USE_32BIT_TIME_T -I$(WATT_ROOT)\inc
+CFLAGS  = $(CFLAGS) -UWIN32 -DWATT32 -I$(WATT_ROOT)\inc
 EX_LIBS = $(WATT_ROOT)\lib\wattcpvc_imp.lib
 
 !else
@@ -35,13 +35,15 @@ EX_LIBS = advapi32.lib ws2_32.lib
 !endif
 
 !if "$(DEBUG_MODEL)" == "d"
-CFLAGS  = $(CFLAGS) -D_DEBUG -GZ
+CFLAGS  = $(CFLAGS) -DDEBUGBUILD -D_DEBUG -GZ
 LDFLAGS = $(LDFLAGS) -debug -fixed:no
 
 !else
 CFLAGS  = $(CFLAGS) -O2 -Og
 LDFLAGS = $(LDFLAGS) -release
 !endif
+
+CFLAGS  = $(CFLAGS) -I.\.
 
 OBJECTS = $(OBJ_DIR)\ares_fds.obj              \
           $(OBJ_DIR)\ares_process.obj          \
@@ -61,6 +63,7 @@ OBJECTS = $(OBJ_DIR)\ares_fds.obj              \
           $(OBJ_DIR)\ares_strerror.obj         \
           $(OBJ_DIR)\ares_cancel.obj           \
           $(OBJ_DIR)\ares_init.obj             \
+          $(OBJ_DIR)\ares_library_init.obj     \
           $(OBJ_DIR)\ares_llist.obj            \
           $(OBJ_DIR)\ares_timeout.obj          \
           $(OBJ_DIR)\ares__timeval.obj         \
@@ -108,6 +111,8 @@ $(DEF_FILE): $(OBJECTS) Makefile.VC6
        @echo   ares_getsock           >> $@
        @echo   ares_init              >> $@
        @echo   ares_init_options      >> $@
+       @echo   ares_library_init      >> $@
+       @echo   ares_library_cleanup   >> $@
        @echo   ares_mkquery           >> $@
        @echo   ares_parse_a_reply     >> $@
        @echo   ares_parse_ptr_reply   >> $@
@@ -154,101 +159,116 @@ vclean realclean: clean
 # Copyright "gcc -MM .."
 #
 $(OBJ_DIR)\ares_fds.obj: ares_fds.c setup.h setup_once.h ares.h ares_private.h \
-  ares_ipv6.h
+  ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_process.obj: ares_process.c setup.h setup_once.h nameser.h     \
-  ares.h ares_dns.h ares_private.h ares_ipv6.h
+  ares.h ares_dns.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_free_hostent.obj: ares_free_hostent.c setup.h setup_once.h     \
-  ares.h ares_private.h ares_ipv6.h
+  ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_query.obj: ares_query.c setup.h setup_once.h nameser.h         \
-  ares.h ares_dns.h ares_private.h ares_ipv6.h
+  ares.h ares_dns.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares__close_sockets.obj: ares__close_sockets.c setup.h setup_once.h \
-  ares.h ares_private.h ares_ipv6.h
+  ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
-$(OBJ_DIR)\ares_free_string.obj: ares_free_string.c setup.h setup_once.h ares.h
+$(OBJ_DIR)\ares_free_string.obj: ares_free_string.c setup.h setup_once.h       \
+  ares.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_search.obj: ares_search.c setup.h setup_once.h nameser.h       \
-  ares.h ares_private.h ares_ipv6.h
+  ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares__get_hostent.obj: ares__get_hostent.c setup.h setup_once.h     \
-  ares.h ares_private.h ares_ipv6.h inet_net_pton.h
+  ares.h ares_private.h ares_ipv6.h inet_net_pton.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_gethostbyaddr.obj: ares_gethostbyaddr.c setup.h setup_once.h   \
-  nameser.h ares.h ares_private.h ares_ipv6.h inet_net_pton.h
+  nameser.h ares.h ares_private.h ares_ipv6.h inet_net_pton.h ares_build.h     \
+  ares_rules.h
 
 $(OBJ_DIR)\ares_send.obj: ares_send.c setup.h setup_once.h nameser.h ares.h    \
-  ares_dns.h ares_private.h ares_ipv6.h
+  ares_dns.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares__read_line.obj: ares__read_line.c setup.h setup_once.h ares.h  \
-  ares_private.h ares_ipv6.h
+  ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_gethostbyname.obj: ares_gethostbyname.c setup.h setup_once.h   \
-  nameser.h ares.h ares_private.h ares_ipv6.h inet_net_pton.h bitncmp.h
+  nameser.h ares.h ares_private.h ares_ipv6.h inet_net_pton.h bitncmp.h        \
+  ares_build.h ares_rules.h
 
-$(OBJ_DIR)\ares_strcasecmp.obj: ares_strcasecmp.c setup.h setup_once.h ares.h
+$(OBJ_DIR)\ares_strcasecmp.obj: ares_strcasecmp.c setup.h setup_once.h ares.h  \
+  ares_build.h ares_rules.h
 
-$(OBJ_DIR)\ares_strerror.obj: ares_strerror.c setup.h setup_once.h ares.h
+$(OBJ_DIR)\ares_strerror.obj: ares_strerror.c setup.h setup_once.h ares.h      \
+  ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_cancel.obj: ares_cancel.c setup.h setup_once.h ares.h          \
-  ares_private.h ares_ipv6.h
+  ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_init.obj: ares_init.c setup.h setup_once.h nameser.h ares.h    \
-  ares_private.h ares_ipv6.h inet_net_pton.h
+  ares_private.h ares_ipv6.h inet_net_pton.h ares_build.h ares_rules.h         \
+  ares_library_init.h
 
 $(OBJ_DIR)\ares_timeout.obj: ares_timeout.c setup.h setup_once.h ares.h        \
-  ares_private.h ares_ipv6.h
+  ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares__timeval.obj: ares__timeval.c setup.h setup_once.h ares.h      \
-  ares_private.h ares_ipv6.h
+  ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_destroy.obj: ares_destroy.c setup.h setup_once.h ares.h        \
-  ares_private.h ares_ipv6.h
+  ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_mkquery.obj: ares_mkquery.c setup.h setup_once.h nameser.h     \
-  ares.h ares_dns.h
+  ares.h ares_dns.h ares_build.h ares_rules.h
 
-$(OBJ_DIR)\ares_version.obj: ares_version.c setup.h setup_once.h ares_version.h
+$(OBJ_DIR)\ares_version.obj: ares_version.c setup.h setup_once.h ares.h        \
+  ares_version.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_expand_name.obj: ares_expand_name.c setup.h setup_once.h       \
-  nameser.h ares.h ares_private.h ares_ipv6.h
+  nameser.h ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_parse_a_reply.obj: ares_parse_a_reply.c setup.h setup_once.h   \
-  nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h
+  nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h ares_build.h          \
+  ares_rules.h
 
 $(OBJ_DIR)\windows_port.obj: windows_port.c setup.h setup_once.h nameser.h     \
-  ares.h ares_private.h ares_ipv6.h
+  ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_expand_string.obj: ares_expand_string.c setup.h setup_once.h   \
-  nameser.h ares.h ares_private.h ares_ipv6.h
+  nameser.h ares.h ares_private.h ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_parse_ptr_reply.obj: ares_parse_ptr_reply.c setup.h            \
-  setup_once.h nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h
+  setup_once.h nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h          \
+  ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_parse_aaaa_reply.obj: ares_parse_aaaa_reply.c setup.h          \
   setup_once.h nameser.h ares.h ares_dns.h inet_net_pton.h ares_private.h      \
-  ares_ipv6.h
+  ares_ipv6.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_parse_ns_reply.obj: ares_parse_ns_reply.c setup.h              \
-  setup_once.h nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h
+  setup_once.h nameser.h ares.h ares_dns.h ares_private.h ares_ipv6.h          \
+  ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_getnameinfo.obj: ares_getnameinfo.c setup.h setup_once.h       \
-  nameser.h ares.h ares_private.h ares_ipv6.h inet_ntop.h
+  nameser.h ares.h ares_private.h ares_ipv6.h inet_ntop.h ares_build.h         \
+  ares_rules.h
 
 $(OBJ_DIR)\inet_net_pton.obj: inet_net_pton.c setup.h setup_once.h nameser.h   \
-  ares_ipv6.h inet_net_pton.h
+  ares_ipv6.h inet_net_pton.h ares_build.h ares_rules.h
 
-$(OBJ_DIR)\bitncmp.obj: bitncmp.c bitncmp.h
+$(OBJ_DIR)\bitncmp.obj: bitncmp.c bitncmp.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\inet_ntop.obj: inet_ntop.c setup.h setup_once.h nameser.h           \
-  ares_ipv6.h inet_ntop.h
+  ares_ipv6.h inet_ntop.h ares_build.h ares_rules.h
 
-$(OBJ_DIR)\ares_getopt.obj: ares_getopt.c ares_getopt.h
+$(OBJ_DIR)\ares_getopt.obj: ares_getopt.c ares_getopt.h ares_build.h           \
+  ares_rules.h
+
+$(OBJ_DIR)\ares_library_init.obj: ares_library_init.c setup.h setup_once.h     \
+  ares.h ares_private.h ares_library_init.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_llist.obj: ares_llist.c setup.h setup_once.h ares.h            \
-  ares_private.h ares_llist.h
+  ares_private.h ares_llist.h ares_build.h ares_rules.h
 
 $(OBJ_DIR)\ares_writev.obj: ares_writev.c setup.h setup_once.h ares.h          \
-  ares_writev.h
+  ares_writev.h ares_build.h ares_rules.h

@@ -1,5 +1,5 @@
 /*
- * $Id: acountry.c,v 1.11 2008-12-02 02:58:04 danf Exp $
+ * $Id: acountry.c,v 1.16 2009-08-03 12:20:03 giva Exp $
  *
  * IP-address/hostname to country converter.
  *
@@ -10,8 +10,8 @@
  *   CNAME = zz<CC>.countries.nerd.dk with address 127.0.x.y (ver 1) or
  *   CNAME = <a.b.c.d>.zz.countries.nerd.dk with address 127.0.x.y (ver 2)
  *
- * The 2 letter country code in <CC> and the ISO-3166 country
- * number in x.y (number = x*256 + y). Version 2 of the protocol is missing
+ * The 2 letter country code is in <CC> and the ISO-3166 country
+ * number is in x.y (number = x*256 + y). Version 2 of the protocol is missing
  * the <CC> number.
  *
  * Ref: http://countries.nerd.dk/more.html
@@ -116,6 +116,13 @@ int main(int argc, char **argv)
   WSAStartup(wVersionRequested, &wsaData);
 #endif
 
+  status = ares_library_init(ARES_LIB_INIT_ALL);
+  if (status != ARES_SUCCESS)
+    {
+      fprintf(stderr, "ares_library_init: %s\n", ares_strerror(status));
+      return 1;
+    }
+
   while ((ch = ares_getopt(argc, argv, "dvh?")) != -1)
     switch (ch)
       {
@@ -177,6 +184,8 @@ int main(int argc, char **argv)
 
   wait_ares(channel);
   ares_destroy(channel);
+
+  ares_library_cleanup();
 
 #if defined(WIN32) && !defined(WATT32)
   WSACleanup();
@@ -547,7 +556,7 @@ static void find_country_from_cname(const char *cname, struct in_addr addr)
   const struct search_list *country;
   char  ccode_A2[3], *ccopy, *dot_4;
   int   cnumber, z0, z1, ver_1, ver_2;
-  u_long ip;
+  unsigned long ip;
 
   ip = ntohl(addr.s_addr);
   z0 = tolower(cname[0]);
@@ -603,9 +612,14 @@ static void find_country_from_cname(const char *cname, struct in_addr addr)
     printf("Name for country-number %d not found.\n", cnumber);
   else
     {
-      if (ver_1 && *(unsigned short*)&country->short_name != *(unsigned*)&ccode_A2)
-        printf("short-name mismatch; %s vs %s\n", country->short_name, ccode_A2);
-
+      if (ver_1)
+        {
+          if ((country->short_name[0] != ccode_A2[0]) ||
+              (country->short_name[1] != ccode_A2[1]) ||
+              (country->short_name[2] != ccode_A2[2]))
+            printf("short-name mismatch; %s vs %s\n",
+                   country->short_name, ccode_A2);
+        }
       printf("%s (%s), number %d.\n",
              country->long_name, country->short_name, cnumber);
     }

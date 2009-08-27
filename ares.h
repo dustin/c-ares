@@ -1,7 +1,7 @@
-/* $Id: ares.h,v 1.48 2008-12-04 12:53:03 bagder Exp $ */
+/* $Id: ares.h,v 1.58 2009-08-03 11:51:06 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
- * Copyright (C) 2007-2008 by Daniel Stenberg
+ * Copyright (C) 2007-2009 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -18,6 +18,10 @@
 
 #ifndef ARES__H
 #define ARES__H
+
+#include "ares_version.h"  /* c-ares version defines   */
+#include "ares_build.h"    /* c-ares build definitions */
+#include "ares_rules.h"    /* c-ares rules enforcement */
 
 /*
  * Define WIN32 when build target is Win32 API
@@ -82,6 +86,7 @@ extern "C" {
 #define ARES_ENOMEM             15
 #define ARES_EDESTRUCTION       16
 #define ARES_EBADSTR            17
+#define ARES_ECANCELLED         21
 
 /* ares_getnameinfo error codes */
 #define ARES_EBADFLAGS          18
@@ -89,6 +94,13 @@ extern "C" {
 /* ares_getaddrinfo error codes */
 #define ARES_ENONAME            19
 #define ARES_EBADHINTS          20
+
+/* Uninitialized library error code */
+#define ARES_ENOTINITIALIZED    21
+
+/* ares_library_init error codes */
+#define ARES_ELOADIPHLPAPI           22
+#define ARES_EADDRGETNETWORKPARAMS   23
 
 /* Flag values */
 #define ARES_FLAG_USEVC         (1 << 0)
@@ -157,6 +169,11 @@ extern "C" {
 #define ARES_GETSOCK_READABLE(bits,num) (bits & (1<< (num)))
 #define ARES_GETSOCK_WRITABLE(bits,num) (bits & (1 << ((num) + \
                                          ARES_GETSOCK_MAXNUM)))
+
+/* c-ares library initialization flag values */
+#define ARES_LIB_INIT_NONE   (0)
+#define ARES_LIB_INIT_WIN32  (1 << 0)
+#define ARES_LIB_INIT_ALL    (ARES_LIB_INIT_WIN32)
 
 
 /*
@@ -232,6 +249,10 @@ typedef void (*ares_nameinfo_callback)(void *arg, int status, int timeouts,
 typedef int  (*ares_sock_create_callback)(ares_socket_t socket_fd,
                                           int type, void *data);
 
+int ares_library_init(int flags);
+void ares_library_cleanup(void);
+const char *ares_version(int *version);
+
 int ares_init(ares_channel *channelptr);
 int ares_init_options(ares_channel *channelptr, struct ares_options *options,
                       int optmask);
@@ -257,7 +278,7 @@ int ares_gethostbyname_file(ares_channel channel, const char *name,
 void ares_gethostbyaddr(ares_channel channel, const void *addr, int addrlen,
                         int family, ares_host_callback callback, void *arg);
 void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa,
-                      socklen_t salen, int flags,
+                      ares_socklen_t salen, int flags,
                       ares_nameinfo_callback callback,
                       void *arg);
 int ares_fds(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
@@ -275,21 +296,29 @@ int ares_expand_name(const unsigned char *encoded, const unsigned char *abuf,
 int ares_expand_string(const unsigned char *encoded, const unsigned char *abuf,
                      int alen, unsigned char **s, long *enclen);
 
-#if !defined(HAVE_STRUCT_IN6_ADDR) && !defined(s6_addr)
-struct in6_addr {
+/*
+ * NOTE: before c-ares 1.6.1 we would most often use the system in6_addr
+ * struct below when ares itself was built, but many apps would use this
+ * private version since the header checked a HAVE_* define for it. Starting
+ * with 1.6.1 we always declare and use our own to stop relying on the
+ * system's one.
+ */
+struct ares_in6_addr {
   union {
     unsigned char _S6_u8[16];
   } _S6_un;
 };
-#define s6_addr _S6_un._S6_u8
-#endif
 
+/*
+ * TODO: the structs 'addrttl' and 'addr6ttl' really should get their names
+ * prefixed with ares_ to keep them in our own "name space".
+ */
 struct addrttl {
   struct in_addr ipaddr;
   int            ttl;
 };
 struct addr6ttl {
-  struct in6_addr ip6addr;
+  struct ares_in6_addr ip6addr;
   int             ttl;
 };
 
@@ -304,12 +333,12 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
                        struct hostent **host,
                        struct addrttl *addrttls, int *naddrttls);
 int ares_parse_aaaa_reply(const unsigned char *abuf, int alen,
-                       struct hostent **host,
-                       struct addr6ttl *addrttls, int *naddrttls);
+                          struct hostent **host,
+                          struct addr6ttl *addrttls, int *naddrttls);
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
                          int addrlen, int family, struct hostent **host);
 int ares_parse_ns_reply(const unsigned char *abuf, int alen,
-                       struct hostent **host);
+                        struct hostent **host);
 void ares_free_string(void *str);
 void ares_free_hostent(struct hostent *host);
 const char *ares_strerror(int code);

@@ -63,8 +63,8 @@ LIB32=link.exe -lib
 # PROP Output_Dir "Debug"
 # PROP Intermediate_Dir "Debug"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ /c
+# ADD BASE CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "DEBUGBUILD" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "DEBUGBUILD" /D "_DEBUG" /D "_MBCS" /D "_LIB" /FD /GZ /c
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
@@ -142,6 +142,10 @@ SOURCE=..\..\ares_getsock.c
 # Begin Source File
 
 SOURCE=..\..\ares_init.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_library_init.c
 # End Source File
 # Begin Source File
 
@@ -225,6 +229,10 @@ SOURCE=..\..\ares.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\ares_build.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\ares_dns.h
 # End Source File
 # Begin Source File
@@ -233,11 +241,19 @@ SOURCE=..\..\ares_ipv6.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\ares_library_init.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\ares_llist.h
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\ares_private.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_rules.h
 # End Source File
 # Begin Source File
 

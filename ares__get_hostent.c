@@ -1,4 +1,4 @@
-/* $Id: ares__get_hostent.c,v 1.16 2008-09-15 17:14:29 yangtse Exp $ */
+/* $Id: ares__get_hostent.c,v 1.18 2009-04-14 12:53:53 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -47,7 +47,7 @@ int ares__get_hostent(FILE *fp, int family, struct hostent **host)
   int status, linesize, end_at_hostname, naliases;
   struct in_addr addr;
   struct in6_addr addr6;
-  int addrlen = sizeof(struct in_addr);
+  size_t addrlen = sizeof(struct in_addr);
   struct hostent *hostent = NULL;
 
   while ((status = ares__read_line(fp, &line, &linesize)) == ARES_SUCCESS)
@@ -68,17 +68,21 @@ int ares__get_hostent(FILE *fp, int family, struct hostent **host)
       *p = 0;
       addr.s_addr = inet_addr(line);
       if (addr.s_addr == INADDR_NONE)
-       {
-          if (ares_inet_pton(AF_INET6, line, &addr6) > 0)
-            {
-              if (family != AF_INET6)
-                continue;
-              addrlen = sizeof(struct in6_addr);
-            }
-          else
-            continue;
-       }
+      {
+        /* It wasn't an AF_INET dotted address, then AF_UNSPEC and AF_INET6
+           families are subject for this further check */
+        if ((family != AF_INET) &&
+            (ares_inet_pton(AF_INET6, line, &addr6) > 0)) {
+          addrlen = sizeof(struct in6_addr);
+          family = AF_INET6;
+        }
+        else
+          continue;
+      }
+      else if (family == AF_UNSPEC)
+        family = AF_INET; /* now confirmed! */
       else if (family != AF_INET)
+        /* unknown, keep moving */
         continue;
 
       /* Get the canonical hostname. */
@@ -158,7 +162,7 @@ int ares__get_hostent(FILE *fp, int family, struct hostent **host)
       hostent->h_aliases[naliases] = NULL;
 
       hostent->h_addrtype = family;
-      hostent->h_length = addrlen;
+      hostent->h_length = (int)addrlen;
       if (family == AF_INET)
         memcpy(hostent->h_addr_list[0], &addr, addrlen);
       else if (family == AF_INET6)
