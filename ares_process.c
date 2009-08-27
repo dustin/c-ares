@@ -1,4 +1,4 @@
-/* $Id: ares_process.c,v 1.67 2008-08-26 03:08:27 yangtse Exp $ */
+/* $Id: ares_process.c,v 1.73 2008-12-04 12:53:03 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  * Copyright (C) 2004-2008 by Daniel Stenberg
@@ -18,47 +18,45 @@
 
 #include "setup.h"
 
-#if defined(WIN32) && !defined(WATT32)
-#include "nameser.h"
-
-#else
 #ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
+#  include <sys/socket.h>
 #endif
 #ifdef HAVE_SYS_UIO_H
-#include <sys/uio.h>
+#  include <sys/uio.h>
 #endif
 #ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h> /* <netinet/tcp.h> may need it */
+#  include <netinet/in.h>
 #endif
 #ifdef HAVE_NETINET_TCP_H
-#include <netinet/tcp.h> /* for TCP_NODELAY */
+#  include <netinet/tcp.h>
 #endif
 #ifdef HAVE_NETDB_H
-#include <netdb.h>
+#  include <netdb.h>
 #endif
 #ifdef HAVE_ARPA_NAMESER_H
-#include <arpa/nameser.h>
+#  include <arpa/nameser.h>
+#else
+#  include "nameser.h"
 #endif
 #ifdef HAVE_ARPA_NAMESER_COMPAT_H
-#include <arpa/nameser_compat.h>
+#  include <arpa/nameser_compat.h>
 #endif
+
 #ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
+#  include <sys/time.h>
 #endif
-#endif /* WIN32 && !WATT32 */
 
 #ifdef HAVE_STRINGS_H
-#include <strings.h>
+#  include <strings.h>
 #endif
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>
+#  include <unistd.h>
 #endif
 #ifdef HAVE_SYS_IOCTL_H
-#include <sys/ioctl.h>
+#  include <sys/ioctl.h>
 #endif
 #ifdef NETWARE
-#include <sys/filio.h>
+#  include <sys/filio.h>
 #endif
 
 #include <assert.h>
@@ -672,30 +670,33 @@ static void skip_server(ares_channel channel, struct query *query,
 static void next_server(ares_channel channel, struct query *query,
                         struct timeval *now)
 {
-  /* Advance to the next server or try. */
-  query->server++;
-  for (; query->try < channel->tries; query->try++)
+  /* We need to try each server channel->tries times. We have channel->nservers
+   * servers to try. In total, we need to do channel->nservers * channel->tries
+   * attempts. Use query->try to remember how many times we already attempted
+   * this query. Use modular arithmetic to find the next server to try. */
+  while (++(query->try) < (channel->nservers * channel->tries))
     {
-      for (; query->server < channel->nservers; query->server++)
+      struct server_state *server;
+
+      /* Move on to the next server. */
+      query->server = (query->server + 1) % channel->nservers;
+      server = &channel->servers[query->server];
+
+      /* We don't want to use this server if (1) we decided this
+       * connection is broken, and thus about to be closed, (2)
+       * we've decided to skip this server because of earlier
+       * errors we encountered, or (3) we already sent this query
+       * over this exact connection.
+       */
+      if (!server->is_broken &&
+           !query->server_info[query->server].skip_server &&
+           !(query->using_tcp &&
+             (query->server_info[query->server].tcp_connection_generation ==
+              server->tcp_connection_generation)))
         {
-          struct server_state *server = &channel->servers[query->server];
-          /* We don't want to use this server if (1) we decided this
-           * connection is broken, and thus about to be closed, (2)
-           * we've decided to skip this server because of earlier
-           * errors we encountered, or (3) we already sent this query
-           * over this exact connection.
-           */
-          if (!server->is_broken &&
-               !query->server_info[query->server].skip_server &&
-               !(query->using_tcp &&
-                 (query->server_info[query->server].tcp_connection_generation ==
-                  server->tcp_connection_generation)))
-            {
-               ares__send_query(channel, query, now);
-               return;
-            }
+           ares__send_query(channel, query, now);
+           return;
         }
-      query->server = 0;
 
       /* You might think that with TCP we only need one try. However,
        * even when using TCP, servers can time-out our connection just
@@ -704,6 +705,8 @@ static void next_server(ares_channel channel, struct query *query,
        * tickle a bug that drops our request.
        */
     }
+
+  /* If we are here, all attempts to perform query failed. */
   end_query(channel, query, query->error_status, NULL, 0);
 }
 
@@ -777,8 +780,7 @@ void ares__send_query(ares_channel channel, struct query *query,
     }
     query->timeout = *now;
     ares__timeadd(&query->timeout,
-                  (query->try == 0) ? channel->timeout
-                  : channel->timeout << query->try / channel->nservers);
+                  channel->timeout << (query->try / channel->nservers));
     /* Keep track of queries bucketed by timeout, so we can process
      * timeout events quickly.
      */
@@ -803,68 +805,51 @@ void ares__send_query(ares_channel channel, struct query *query,
 static int setsocknonblock(ares_socket_t sockfd,    /* operate on this */
                     int nonblock   /* TRUE or FALSE */)
 {
-#undef SETBLOCK
-#define SETBLOCK 0
-#ifdef HAVE_O_NONBLOCK
+#if defined(USE_BLOCKING_SOCKETS)
+
+  return 0; /* returns success */
+
+#elif defined(HAVE_FCNTL_O_NONBLOCK)
+
   /* most recent unix versions */
   int flags;
-
   flags = fcntl(sockfd, F_GETFL, 0);
   if (FALSE != nonblock)
     return fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
   else
     return fcntl(sockfd, F_SETFL, flags & (~O_NONBLOCK));
-#undef SETBLOCK
-#define SETBLOCK 1
-#endif
 
-#if defined(HAVE_FIONBIO) && (SETBLOCK == 0)
+#elif defined(HAVE_IOCTL_FIONBIO)
+
   /* older unix versions */
   int flags;
-
   flags = nonblock;
   return ioctl(sockfd, FIONBIO, &flags);
-#undef SETBLOCK
-#define SETBLOCK 2
-#endif
 
-#if defined(HAVE_IOCTLSOCKET) && (SETBLOCK == 0)
+#elif defined(HAVE_IOCTLSOCKET_FIONBIO)
+
 #ifdef WATT32
   char flags;
 #else
-  /* Windows? */
+  /* Windows */
   unsigned long flags;
 #endif
   flags = nonblock;
-
   return ioctlsocket(sockfd, FIONBIO, &flags);
-#undef SETBLOCK
-#define SETBLOCK 3
-#endif
 
-#if defined(HAVE_IOCTLSOCKET_CASE) && (SETBLOCK == 0)
-  /* presumably for Amiga */
+#elif defined(HAVE_IOCTLSOCKET_CAMEL_FIONBIO)
+
+  /* Amiga */
   return IoctlSocket(sockfd, FIONBIO, (long)nonblock);
-#undef SETBLOCK
-#define SETBLOCK 4
-#endif
 
-#if defined(HAVE_SO_NONBLOCK) && (SETBLOCK == 0)
+#elif defined(HAVE_SETSOCKOPT_SO_NONBLOCK)
+
   /* BeOS */
   long b = nonblock ? 1 : 0;
   return setsockopt(sockfd, SOL_SOCKET, SO_NONBLOCK, &b, sizeof(b));
-#undef SETBLOCK
-#define SETBLOCK 5
-#endif
 
-#ifdef HAVE_DISABLED_NONBLOCKING
-  return 0; /* returns success */
-#undef SETBLOCK
-#define SETBLOCK 6
-#endif
-
-#if (SETBLOCK == 0)
-#error "no non-blocking method was found/used/set"
+#else
+#  error "no non-blocking method was found/used/set"
 #endif
 }
 
@@ -908,10 +893,11 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   /* Configure it. */
   if (configure_socket(s, channel) < 0)
     {
-       close(s);
+       closesocket(s);
        return -1;
     }
 
+#ifdef TCP_NODELAY
   /*
    * Disable the Nagle algorithm (only relevant for TCP sockets, and thus not in
    * configure_socket). In general, in DNS lookups we're pretty much interested
@@ -922,23 +908,37 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY,
                  (void *)&opt, sizeof(opt)) == -1)
     {
-       close(s);
+       closesocket(s);
        return -1;
     }
+#endif
 
   /* Connect to the server. */
   memset(&sockin, 0, sizeof(sockin));
   sockin.sin_family = AF_INET;
   sockin.sin_addr = server->addr;
   sockin.sin_port = (unsigned short)(channel->tcp_port & 0xffff);
-  if (connect(s, (struct sockaddr *) &sockin, sizeof(sockin)) == -1) {
-    int err = SOCKERRNO;
+  if (connect(s, (struct sockaddr *) &sockin, sizeof(sockin)) == -1)
+    {
+      int err = SOCKERRNO;
 
-    if (err != EINPROGRESS && err != EWOULDBLOCK) {
-      closesocket(s);
-      return -1;
+      if (err != EINPROGRESS && err != EWOULDBLOCK)
+        {
+          closesocket(s);
+          return -1;
+        }
     }
-  }
+
+  if (channel->sock_create_cb)
+    {
+      int err = channel->sock_create_cb(s, SOCK_STREAM,
+                                        channel->sock_create_cb_data);
+      if (err < 0)
+        {
+          closesocket(s);
+          return err;
+        }
+    }
 
   SOCK_STATE_CALLBACK(channel, s, 1, 0);
   server->tcp_buffer_pos = 0;
@@ -960,7 +960,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
   /* Set the socket non-blocking. */
   if (configure_socket(s, channel) < 0)
     {
-       close(s);
+       closesocket(s);
        return -1;
     }
 
@@ -971,8 +971,24 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
   sockin.sin_port = (unsigned short)(channel->udp_port & 0xffff);
   if (connect(s, (struct sockaddr *) &sockin, sizeof(sockin)) == -1)
     {
-      closesocket(s);
-      return -1;
+      int err = SOCKERRNO;
+
+      if (err != EINPROGRESS && err != EWOULDBLOCK)
+        {
+          closesocket(s);
+          return -1;
+        }
+    }
+
+  if (channel->sock_create_cb)
+    {
+      int err = channel->sock_create_cb(s, SOCK_DGRAM,
+                                        channel->sock_create_cb_data);
+      if (err < 0)
+        {
+          closesocket(s);
+          return err;
+        }
     }
 
   SOCK_STATE_CALLBACK(channel, s, 1, 0);

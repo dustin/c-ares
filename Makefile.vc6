@@ -1,4 +1,4 @@
-# $Id: Makefile.vc6,v 1.16 2008-08-20 23:38:36 yangtse Exp $
+# $Id: Makefile.vc6,v 1.19 2008-12-08 16:09:21 giva Exp $
 #
 # C-ares makefile for MSVC6+
 # G. Vanem <giva@bgnett.no>.
@@ -26,7 +26,7 @@ OBJ_DIR  = VC6_obj
 DEF_FILE = cares.def
 
 !if "$(USE_WATT32)" == "1"
-CFLAGS  = $(CFLAGS) -UWIN32 -DWATT32 -I$(WATT_ROOT)\inc
+CFLAGS  = $(CFLAGS) -UWIN32 -DWATT32 -D_USE_32BIT_TIME_T -I$(WATT_ROOT)\inc
 EX_LIBS = $(WATT_ROOT)\lib\wattcpvc_imp.lib
 
 !else
@@ -57,6 +57,7 @@ OBJECTS = $(OBJ_DIR)\ares_fds.obj              \
           $(OBJ_DIR)\ares__read_line.obj       \
           $(OBJ_DIR)\ares_gethostbyname.obj    \
           $(OBJ_DIR)\ares_getnameinfo.obj      \
+          $(OBJ_DIR)\ares_strcasecmp.obj       \
           $(OBJ_DIR)\ares_strerror.obj         \
           $(OBJ_DIR)\ares_cancel.obj           \
           $(OBJ_DIR)\ares_init.obj             \
@@ -73,6 +74,7 @@ OBJECTS = $(OBJ_DIR)\ares_fds.obj              \
           $(OBJ_DIR)\windows_port.obj          \
           $(OBJ_DIR)\ares_expand_string.obj    \
           $(OBJ_DIR)\ares_parse_ptr_reply.obj  \
+          $(OBJ_DIR)\ares_writev.obj           \
           $(OBJ_DIR)\bitncmp.obj               \
           $(OBJ_DIR)\inet_net_pton.obj         \
           $(OBJ_DIR)\inet_ntop.obj
@@ -122,9 +124,11 @@ $(DEF_FILE): $(OBJECTS) Makefile.VC6
        @echo   ares_inet_net_pton     >> $@
        @echo   ares_inet_ntop         >> $@
        @echo   ares_inet_pton         >> $@
-       @echo   ares_writev            >> $@
        @echo   ares_getnameinfo       >> $@
        @echo   ares_parse_aaaa_reply  >> $@
+!if "$(USE_WATT32)" == "0"
+       @echo   ares_writev            >> $@
+!endif
 
 ahost.exe: $(OBJ_DIR) $(OBJ_DIR)\ahost.obj $(OBJ_DIR)\ares_getopt.obj cares_imp.lib
        link $(LDFLAGS) -out:$@ $(OBJ_DIR)\ahost.obj $(OBJ_DIR)\ares_getopt.obj cares_imp.lib $(EX_LIBS)
@@ -183,6 +187,8 @@ $(OBJ_DIR)\ares__read_line.obj: ares__read_line.c setup.h setup_once.h ares.h  \
 
 $(OBJ_DIR)\ares_gethostbyname.obj: ares_gethostbyname.c setup.h setup_once.h   \
   nameser.h ares.h ares_private.h ares_ipv6.h inet_net_pton.h bitncmp.h
+
+$(OBJ_DIR)\ares_strcasecmp.obj: ares_strcasecmp.c setup.h setup_once.h ares.h
 
 $(OBJ_DIR)\ares_strerror.obj: ares_strerror.c setup.h setup_once.h ares.h
 
@@ -243,3 +249,6 @@ $(OBJ_DIR)\ares_getopt.obj: ares_getopt.c ares_getopt.h
 
 $(OBJ_DIR)\ares_llist.obj: ares_llist.c setup.h setup_once.h ares.h            \
   ares_private.h ares_llist.h
+
+$(OBJ_DIR)\ares_writev.obj: ares_writev.c setup.h setup_once.h ares.h          \
+  ares_writev.h

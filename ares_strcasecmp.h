@@ -1,9 +1,9 @@
-#ifndef __ARES_INET_NTOP_H
-#define __ARES_INET_NTOP_H
+#ifndef HEADER_CARES_STRCASECMP_H
+#define HEADER_CARES_STRCASECMP_H
 
-/* $Id: inet_ntop.h,v 1.4 2008-09-24 16:43:12 yangtse Exp $ */
+/* $Id: ares_strcasecmp.h,v 1.1 2008-09-15 15:28:26 yangtse Exp $ */
 
-/* Copyright (C) 2005 by Dominick Meglio
+/* Copyright 1998 by the Massachusetts Institute of Technology.
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -18,10 +18,14 @@
  * without express or implied warranty.
  */
 
-#ifdef HAVE_INET_NTOP
-#define ares_inet_ntop(w,x,y,z) inet_ntop(w,x,y,z)
-#else
-const char *ares_inet_ntop(int af, const void *src, char *dst, size_t size);
+#include "setup.h"
+
+#ifndef HAVE_STRCASECMP
+extern int ares_strcasecmp(const char *a, const char *b);
 #endif
 
-#endif /* __ARES_INET_NTOP_H */
+#ifndef HAVE_STRNCASECMP
+extern int ares_strncasecmp(const char *a, const char *b, size_t n);
+#endif
+
+#endif /* HEADER_CARES_STRCASECMP_H */

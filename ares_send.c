@@ -1,4 +1,4 @@
-/* $Id: ares_send.c,v 1.16 2008-07-10 08:21:48 yangtse Exp $ */
+/* $Id: ares_send.c,v 1.20 2008-11-29 00:26:07 danf Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -17,14 +17,19 @@
 
 #include "setup.h"
 
-#if defined(WIN32) && !defined(WATT32)
-#include "nameser.h"
-#else
-#include <netinet/in.h>
-#include <arpa/nameser.h>
-#ifdef HAVE_ARPA_NAMESER_COMPAT_H
-#include <arpa/nameser_compat.h>
+#ifdef HAVE_SYS_SOCKET_H
+#  include <sys/socket.h>
 #endif
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#  include <arpa/nameser.h>
+#else
+#  include "nameser.h"
+#endif
+#ifdef HAVE_ARPA_NAMESER_COMPAT_H
+#  include <arpa/nameser_compat.h>
 #endif
 
 #include <stdlib.h>
@@ -93,7 +98,13 @@ void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
 
   /* Initialize query status. */
   query->try = 0;
-  query->server = 0;
+
+  /* Choose the server to send the query to. If rotation is enabled, keep track
+   * of the next server we want to use. */
+  query->server = channel->last_server;
+  if (channel->rotate == 1)
+    channel->last_server = (channel->last_server + 1) % channel->nservers;
+
   for (i = 0; i < channel->nservers; i++)
     {
       query->server_info[i].skip_server = 0;

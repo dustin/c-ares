@@ -1,12 +1,20 @@
 AC_PREREQ(2.57)
 
 dnl Version not hardcoded here. Fetched later from ares_version.h
-AC_INIT([c-ares], [1.5.3],
+AC_INIT([c-ares], [1.6.0],
   [c-ares mailing list => http://cool.haxx.se/mailman/listinfo/c-ares])
+
+CARES_OVERRIDE_AUTOCONF
 
 AC_CONFIG_SRCDIR([ares_ipv6.h])
 AM_CONFIG_HEADER([config.h])
 AM_MAINTAINER_MODE
+
+CARES_CHECK_OPTION_DEBUG
+CARES_CHECK_OPTION_OPTIMIZE
+CARES_CHECK_OPTION_WARNINGS
+
+CARES_CHECK_PATH_SEPARATOR
 
 dnl SED is mandatory for configure process and libtool.
 dnl Set it now, allowing it to be changed later.
@@ -64,7 +72,7 @@ AC_CANONICAL_HOST
 dnl Get system canonical name
 AC_DEFINE_UNQUOTED(OS, "${host}", [cpu-machine-OS])
 
-AC_PROG_CC
+CARES_CHECK_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 
@@ -86,64 +94,15 @@ esac
 dnl support building of Windows DLLs
 AC_LIBTOOL_WIN32_DLL
 
-dnl ************************************************************
-dnl Option to switch on debug options. This makes an assumption that
-dnl this is built as an 'ares' subdir in the curl source tree. Subject for
-dnl improval in the future!
-dnl
-AC_MSG_CHECKING([whether to enable debug options])
-AC_ARG_ENABLE(debug,
-AC_HELP_STRING([--enable-debug],[Enable pedantic debug options])
-AC_HELP_STRING([--disable-debug],[Disable debug options]),
-[ case "$enableval" in
-  no)
-       AC_MSG_RESULT(no)
-       ;;
-  *)   AC_MSG_RESULT(yes)
+CARES_PROCESS_DEBUG_BUILD_OPTS
 
-    dnl when doing the debug stuff, use static library only
-    AC_DISABLE_SHARED
+AM_CONDITIONAL(DEBUGBUILD, test x$want_debug = xyes)
+AM_CONDITIONAL(CURLDEBUG, test x$want_debug = xyes)
 
-    debugbuild="yes"
-
-    dnl the entire --enable-debug is a hack that lives and runs on top of
-    dnl libcurl stuff so this BUILDING_LIBCURL is not THAT much uglier
-    AC_DEFINE(BUILDING_LIBCURL, 1, [when building as static part of libcurl])
-
-    CPPFLAGS="$CPPFLAGS -DCURLDEBUG -I$srcdir/../include"
-    CFLAGS="$CFLAGS -g" 
-
-    dnl set compiler "debug" options to become more picky, and remove
-    dnl optimize options from CFLAGS
-    CURL_CC_DEBUG_OPTS
-
-       ;;
-  esac ],
-       AC_MSG_RESULT(no)
-)
-AM_CONDITIONAL(DEBUGBUILD, test x$debugbuild = xyes)
-AM_CONDITIONAL(CURLDEBUG, test x$debugbuild = xyes)
-
-dnl skip libtool C++ and Fortran compiler checks
-m4_ifdef([AC_PROG_CXX], [m4_undefine([AC_PROG_CXX])])
-m4_defun([AC_PROG_CXX],[])
-m4_ifdef([AC_PROG_CXXCPP], [m4_undefine([AC_PROG_CXXCPP])])
-m4_defun([AC_PROG_CXXCPP],[true])
-m4_ifdef([AC_PROG_F77], [m4_undefine([AC_PROG_F77])])
-m4_defun([AC_PROG_F77],[])
-
-dnl skip libtool C++ and Fortran linker checks
-m4_ifdef([AC_LIBTOOL_CXX], [m4_undefine([AC_LIBTOOL_CXX])])
-m4_defun([AC_LIBTOOL_CXX],[])
-m4_ifdef([AC_LIBTOOL_CXXCPP], [m4_undefine([AC_LIBTOOL_CXXCPP])])
-m4_defun([AC_LIBTOOL_CXXCPP],[true])
-m4_ifdef([AC_LIBTOOL_F77], [m4_undefine([AC_LIBTOOL_F77])])
-m4_defun([AC_LIBTOOL_F77],[])
-
-dnl force libtool to build static libraries with PIC on AMD64-linux
-AC_MSG_CHECKING([if arch-OS host is AMD64-linux (to build static libraries with PIC)])
+dnl force libtool to build static libraries with PIC on AMD64-Linux & FreeBSD
+AC_MSG_CHECKING([if arch-OS host is AMD64-Linux/FreeBSD (to build static libraries with PIC)])
 case $host in
-  x86_64*linux*)
+  x86_64*linux*|amd64*freebsd*|ia64*freebsd*)
     AC_MSG_RESULT([yes])
     with_pic=yes
     ;;
@@ -168,40 +127,28 @@ AC_MSG_RESULT($need_no_undefined)
 AM_CONDITIONAL(NO_UNDEFINED, test x$need_no_undefined = xyes)
 
 dnl **********************************************************************
-dnl check if this is the Intel ICC compiler, and if so make it stricter
-dnl (convert warning 147 into an error) so that it properly can detect the
-dnl gethostbyname_r() version
-dnl **********************************************************************
-CURL_DETECT_ICC([CFLAGS="$CFLAGS -we 147"])
-
-dnl **********************************************************************
 dnl platform/compiler/architecture specific checks/flags
 dnl **********************************************************************
 
+CARES_CHECK_COMPILER
+CARES_SET_COMPILER_BASIC_OPTS
+CARES_SET_COMPILER_DEBUG_OPTS
+CARES_SET_COMPILER_OPTIMIZE_OPTS
+CARES_SET_COMPILER_WARNING_OPTS
+
 case $host in
   #
-  x86_64*linux*)
+  x86_64*linux*|amd64*freebsd*|ia64*freebsd*)
     #
-    dnl find out if icc is being used
-    if test "z$ICC" = "z"; then
-      CURL_DETECT_ICC
-    fi
-    #
-    if test "$ICC" = "yes"; then
-      dnl figure out icc version
-      AC_MSG_CHECKING([icc version])
-      iccver=`$CC -dumpversion`
-      iccnhi=`echo $iccver | cut -d . -f1`
-      iccnlo=`echo $iccver | cut -d . -f2`
-      iccnum=`(expr $iccnhi "*" 100 + $iccnlo) 2>/dev/null`
-      AC_MSG_RESULT($iccver)
+    if test "$compiler_id" = "INTEL_UNIX_C"; then
       #
-      if test "$iccnum" -ge "900" && test "$iccnum" -lt "1000"; then
+      if test "$compiler_num" -ge "900" &&
+        test "$compiler_num" -lt "1000"; then
         dnl icc 9.X specific
         CFLAGS="$CFLAGS -i-dynamic"
       fi
       #
-      if test "$iccnum" -ge "1000"; then
+      if test "$compiler_num" -ge "1000"; then
         dnl icc 10.X or later
         CFLAGS="$CFLAGS -shared-intel"
       fi
@@ -210,44 +157,6 @@ case $host in
     ;;
   #
 esac
-
-AC_MSG_CHECKING([whether we are using the IBM C compiler])
-CURL_CHECK_DEF([__IBMC__], [], [silent])
-if test "$curl_cv_have_def___IBMC__" = "yes"; then
-  AC_MSG_RESULT([yes])
-  dnl Ensure that compiler optimizations are always thread-safe.
-  CFLAGS="$CFLAGS -qthreaded"
-  dnl Disable type based strict aliasing optimizations, using worst
-  dnl case aliasing assumptions when compiling. Type based aliasing
-  dnl would restrict the lvalues that could be safely used to access
-  dnl a data object.
-  CFLAGS="$CFLAGS -qnoansialias"
-  dnl Force compiler to stop after the compilation phase, without
-  dnl generating an object code file when compilation has errors.
-  CFLAGS="$CFLAGS -qhalt=e"
-else
-  AC_MSG_RESULT([no])
-fi
-
-AC_MSG_CHECKING([whether we are using the DEC/Compaq C compiler])
-CURL_CHECK_DEF([__DECC], [], [silent])
-CURL_CHECK_DEF([__DECC_VER], [], [silent])
-if test "$curl_cv_have_def___DECC" = "yes" &&
-  test "$curl_cv_have_def___DECC_VER" = "yes"; then
-  AC_MSG_RESULT([yes])
-  dnl Select strict ANSI C compiler mode
-  CFLAGS="$CFLAGS -std1"
-  dnl Turn off optimizer ANSI C aliasing rules
-  CFLAGS="$CFLAGS -noansi_alias"
-  dnl Select a higher warning level than default level2
-  CFLAGS="$CFLAGS -msg_enable level3"
-  dnl Generate warnings for missing function prototypes
-  CFLAGS="$CFLAGS -warnprotos"
-  dnl Change some warnings into fatal errors
-  CFLAGS="$CFLAGS -msg_fatal toofewargs,toomanyargs"
-else
-  AC_MSG_RESULT([no])
-fi
 
 CURL_CHECK_COMPILER_HALT_ON_ERROR
 CURL_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE
@@ -421,9 +330,7 @@ then
 fi
 
 
-if test "$HAVE_GETHOSTBYNAME" = "1"; then
-  AC_DEFINE(HAVE_GETHOSTBYNAME, 1, [If you have gethostbyname])
-else
+if test "$HAVE_GETHOSTBYNAME" != "1"; then
   AC_MSG_ERROR([couldn't find libraries for gethostbyname()])
 fi
 
@@ -436,6 +343,7 @@ if test "$ac_cv_lib_resolve_strcasecmp" = "$ac_cv_func_strcasecmp"; then
                ,
                -lnsl)
 fi
+ac_cv_func_strcasecmp="no"
 
 dnl socket lib?
 AC_CHECK_FUNC(connect, , [ AC_CHECK_LIB(socket, connect) ])
@@ -531,6 +439,7 @@ AC_CHECK_HEADERS(
        sys/socket.h \
        sys/ioctl.h \
        sys/param.h \
+       sys/uio.h \
        netdb.h \
        netinet/in.h \
        netinet/tcp.h \
@@ -629,6 +538,29 @@ CURL_CHECK_FUNC_RECV
 CURL_CHECK_FUNC_RECVFROM
 CURL_CHECK_FUNC_SEND
 CURL_CHECK_MSG_NOSIGNAL
+
+CARES_CHECK_FUNC_FCNTL
+CARES_CHECK_FUNC_FREEADDRINFO
+CARES_CHECK_FUNC_GETADDRINFO
+CARES_CHECK_FUNC_GETHOSTBYADDR
+CARES_CHECK_FUNC_GETHOSTBYNAME
+CARES_CHECK_FUNC_GETHOSTNAME
+CARES_CHECK_FUNC_GETSERVBYPORT_R
+CARES_CHECK_FUNC_INET_NTOP
+CARES_CHECK_FUNC_INET_PTON
+CARES_CHECK_FUNC_IOCTL
+CARES_CHECK_FUNC_IOCTLSOCKET
+CARES_CHECK_FUNC_IOCTLSOCKET_CAMEL
+CARES_CHECK_FUNC_SETSOCKOPT
+CARES_CHECK_FUNC_STRCASECMP
+CARES_CHECK_FUNC_STRCMPI
+CARES_CHECK_FUNC_STRDUP
+CARES_CHECK_FUNC_STRICMP
+CARES_CHECK_FUNC_STRNCASECMP
+CARES_CHECK_FUNC_STRNCMPI
+CARES_CHECK_FUNC_STRNICMP
+CARES_CHECK_FUNC_WRITEV
+
 
 dnl check for AF_INET6
 CARES_CHECK_CONSTANT(
@@ -819,35 +751,6 @@ AC_CHECK_FUNCS([bitncmp \
 ])
 
 
-dnl check for inet_pton
-AC_CHECK_FUNCS(inet_pton)
-dnl Some systems have it, but not IPv6
-if test "$ac_cv_func_inet_pton" = "yes" ; then
-AC_MSG_CHECKING(if inet_pton supports IPv6)
-AC_TRY_RUN(
-  [
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-int main()
-  {
-    struct in6_addr addr6;
-    if (inet_pton(AF_INET6, "::1", &addr6) < 1)
-      exit(1);
-    else
-      exit(0);
-  }
-  ], [
-       AC_MSG_RESULT(yes)
-       AC_DEFINE_UNQUOTED(HAVE_INET_PTON_IPV6,1,[Define to 1 if inet_pton supports IPv6.])
-     ], AC_MSG_RESULT(no),AC_MSG_RESULT(no))
-fi
 dnl Check for inet_net_pton
 AC_CHECK_FUNCS(inet_net_pton)
 dnl Again, some systems have it, but not IPv6
@@ -878,39 +781,6 @@ int main()
      ], AC_MSG_RESULT(no),AC_MSG_RESULT(no))
 fi
 
-
-dnl Check for inet_ntop
-AC_CHECK_FUNCS(inet_ntop)
-dnl Again, some systems have it, but not IPv6
-if test "$ac_cv_func_inet_ntop" = "yes" ; then
-AC_MSG_CHECKING(if inet_ntop supports IPv6)
-AC_TRY_RUN(
-  [
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#include <errno.h>
-int main()
-  {
-    struct in6_addr addr6;
-    char buf[128];
-    if (inet_ntop(AF_INET6, &addr6, buf, 128) == 0 && errno == EAFNOSUPPORT)
-      exit(1);
-    else
-      exit(0);
-  }
-  ], [
-       AC_MSG_RESULT(yes)
-       AC_DEFINE_UNQUOTED(HAVE_INET_NTOP_IPV6,1,
-          [Define to 1 if inet_ntop supports IPv6.])
-     ], AC_MSG_RESULT(no),AC_MSG_RESULT(no))
-fi
 
 AC_CHECK_SIZEOF(struct in6_addr, ,
 [
@@ -974,12 +844,6 @@ dnl and get the types of five of its arguments.
 CURL_CHECK_FUNC_GETNAMEINFO
 
 
-dnl God bless non-standardized functions! We need to see which getservbyport_r
-dnl variant is available
-CARES_CHECK_GETSERVBYPORT_R
-
-CURL_CHECK_NONBLOCKING_SOCKET
-
 AC_C_BIGENDIAN(
     [AC_DEFINE(ARES_BIG_ENDIAN, 1,
       [define this if ares is built for a big endian system])],
@@ -1010,8 +874,21 @@ if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
         [a suitable file/device to read random data from])
 fi
 
+CARES_CHECK_OPTION_NONBLOCKING
+CARES_CHECK_NONBLOCKING_SOCKET
+
 CARES_PRIVATE_LIBS="$LIBS"
 AC_SUBST(CARES_PRIVATE_LIBS)
+
+dnl squeeze whitespace out of some variables
+
+squeeze CFLAGS
+squeeze CPPFLAGS
+squeeze DEFS
+squeeze LDFLAGS
+squeeze LIBS
+
+squeeze CARES_PRIVATE_LIBS
 
 AC_CONFIG_FILES([Makefile libcares.pc])
 AC_OUTPUT

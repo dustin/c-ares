@@ -1,7 +1,7 @@
 #ifndef __ARES_CONFIG_WIN32_H
 #define __ARES_CONFIG_WIN32_H
 
-/* $Id: config-win32.h,v 1.21 2008-07-17 03:07:54 yangtse Exp $ */
+/* $Id: config-win32.h,v 1.28 2008-12-08 16:12:11 giva Exp $ */
 
 /* Copyright (C) 2004 - 2008 by Daniel Stenberg et al
  *
@@ -76,8 +76,29 @@
 /*                             FUNCTIONS                            */
 /* ---------------------------------------------------------------- */
 
-/* Define if you have the ioctlsocket function.  */
+/* Define if you have the ioctlsocket function. */
 #define HAVE_IOCTLSOCKET 1
+
+/* Define if you have a working ioctlsocket FIONBIO function. */
+#define HAVE_IOCTLSOCKET_FIONBIO 1
+
+/* Define if you have the strcasecmp function. */
+/* #define HAVE_STRCASECMP 1 */
+
+/* Define if you have the strdup function. */
+#define HAVE_STRDUP 1
+
+/* Define if you have the stricmp function. */
+#define HAVE_STRICMP 1
+
+/* Define if you have the strncasecmp function. */
+/* #define HAVE_STRNCASECMP 1 */
+
+/* Define if you have the strnicmp function. */
+#define HAVE_STRNICMP 1
+
+/* Define if you have the gethostname function.  */
+#define HAVE_GETHOSTNAME 1
 
 /* Define if you have the recv function. */
 #define HAVE_RECV 1
@@ -147,6 +168,15 @@
   #define SOCKET              int
   #define NS_INADDRSZ         4
   #define HAVE_ARPA_NAMESER_H 1
+  #define HAVE_ARPA_INET_H    1
+  #define HAVE_NETDB_H        1
+  #define HAVE_NETINET_IN_H   1
+  #define HAVE_SYS_SOCKET_H   1
+  #define HAVE_NETINET_TCP_H  1
+  #define HAVE_AF_INET6       1
+  #define HAVE_PF_INET6       1
+  #define HAVE_STRUCT_IN6_ADDR     1
+  #define HAVE_STRUCT_SOCKADDR_IN6 1
   #undef HAVE_WINSOCK_H
   #undef HAVE_WINSOCK2_H
   #undef HAVE_WS2TCPIP_H
@@ -204,6 +234,20 @@
 #  endif
 #  if (_WIN32_WINNT < 0x0501) || (WINVER < 0x0501)
 #    error VS2008 does not support Windows build targets prior to WinXP
+#  endif
+#endif
+
+/* Availability of freeaddrinfo, getaddrinfo and getnameinfo functions is quite */
+/* convoluted, compiler dependant and in some cases even build target dependat. */
+#if defined(HAVE_WS2TCPIP_H)
+#  if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0501)
+#    define HAVE_FREEADDRINFO 1
+#    define HAVE_GETADDRINFO  1
+#    define HAVE_GETNAMEINFO  1
+#  elif defined(_MSC_VER) && (_MSC_VER >= 1200)
+#    define HAVE_FREEADDRINFO 1
+#    define HAVE_GETADDRINFO  1
+#    define HAVE_GETNAMEINFO  1
 #  endif
 #endif
 

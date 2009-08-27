@@ -1,5 +1,5 @@
 /*
- * $Id: acountry.c,v 1.6 2008-08-25 03:44:43 yangtse Exp $
+ * $Id: acountry.c,v 1.11 2008-12-02 02:58:04 danf Exp $
  *
  * IP-address/hostname to country converter.
  *
@@ -50,6 +50,7 @@
 #if defined(WIN32) && !defined(WATT32)
   #include <winsock.h>
 #else
+  #include <sys/socket.h>
   #include <arpa/inet.h>
   #include <netinet/in.h>
   #include <netdb.h>
@@ -59,6 +60,21 @@
 #include "ares_getopt.h"
 #include "inet_net_pton.h"
 #include "inet_ntop.h"
+
+#ifndef HAVE_STRDUP
+#  include "ares_strdup.h"
+#  define strdup(ptr) ares_strdup(ptr)
+#endif
+
+#ifndef HAVE_STRCASECMP
+#  include "ares_strcasecmp.h"
+#  define strcasecmp(p1,p2) ares_strcasecmp(p1,p2)
+#endif
+
+#ifndef HAVE_STRNCASECMP
+#  include "ares_strcasecmp.h"
+#  define strncasecmp(p1,p2,n) ares_strncasecmp(p1,p2,n)
+#endif
 
 #ifndef INADDR_NONE
 #define INADDR_NONE 0xffffffff
@@ -240,7 +256,7 @@ struct search_list {
        const char *long_name;      /* normal country name */
      };
 
-const struct search_list *list_lookup(int number, const struct search_list *list, int num)
+static const struct search_list *list_lookup(int number, const struct search_list *list, int num)
 {
   while (num > 0 && list->long_name)
     {
@@ -508,7 +524,8 @@ static int is_addr(char *str, char **end)
 {
   int a0, a1, a2, a3, num, rc = 0, length = 0;
 
-  if ((num = sscanf(str,"%3d.%3d.%3d.%3d%n",&a0,&a1,&a2,&a3,&length)) == 4 &&
+  num = sscanf(str,"%3d.%3d.%3d.%3d%n",&a0,&a1,&a2,&a3,&length);
+  if( (num == 4) &&
       BYTE_OK(a0) && BYTE_OK(a1) && BYTE_OK(a2) && BYTE_OK(a3) &&
       length >= (3+4))
     {
@@ -536,6 +553,7 @@ static void find_country_from_cname(const char *cname, struct in_addr addr)
   z0 = tolower(cname[0]);
   z1 = tolower(cname[1]);
   ccopy = strdup(cname);
+  dot_4 = NULL;
 
   ver_1 = (z0 == 'z' && z1 == 'z' && !strcasecmp(cname+4,nerd_ver1));
   ver_2 = (is_addr(ccopy,&dot_4) && !strcasecmp(dot_4,nerd_ver2));
@@ -567,8 +585,8 @@ static void find_country_from_cname(const char *cname, struct in_addr addr)
 
   if (ver_1)
     {
-      ccode_A2[0] = tolower(cname[2]);
-      ccode_A2[1] = tolower(cname[3]);
+      ccode_A2[0] = (char)tolower(cname[2]);
+      ccode_A2[1] = (char)tolower(cname[3]);
       ccode_A2[2] = '\0';
     }
   else

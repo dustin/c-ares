@@ -1,20 +1,25 @@
-This is what's new and changed in the c-ares 1.5.3 release:
+This is what's new and changed in the c-ares 1.6.0 release:
 
- o fix adig sample application compilation failure on some systems
- o fix pkg-config reporting of private libraries needed for static linking
- o fallback to gettimeofday when monotonic clock is unavailable at run-time
- o ares_gethostbyname() fallback from AAA to A records with CNAME present
- o allow --enable-largefile and --disable-largefile configurations
- o configure process no longer needs nor checks size of curl_off_t
- o library will now be built with _REENTRANT symbol defined if needed
- o Improved configure detection of number of arguments for getservbyport_r
- o Improved query-ID randomness
- o Validate that DNS response address matches the request address
- o fix acountry sample application compilation failure on some systems
+Changed:
+
+ o Added support for the glibc "rotate" resolv.conf option (or ARES_OPT_ROTATE)
+ o Added ares_gethostbyname_file()
+ o Added ares_dup()
+ o Added ares_set_socket_callback()
+
+Fixed:
+
+ o improved configure detection of several functions
+ o improved source code portability
+ o adig supports a regular numerical dotted IP address for the -s option
+ o handling of EINPROGRESS for UDP connects
+ o ares_parse_ptr_reply() would cause a buffer to shrink instead of expand if a
+   reply contained 8 or more records
+ o buildconf works on OS X
 
 Thanks go to these friendly people for their efforts and contributions:
 
- Brad House, Yang Tse, Phil Blundell, Tofu Linden, George Neill
- and obviously Daniel Stenberg
+ Yang Tse, Charles Hardin, Carlo Contavalli, Brad Spencer, Gerald Combs,
+ Gregor Jasny
 
 Have fun!

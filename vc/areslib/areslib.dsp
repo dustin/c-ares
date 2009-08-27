@@ -181,6 +181,10 @@ SOURCE=..\..\ares_send.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\ares_strcasecmp.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\ares_strerror.c
 # End Source File
 # Begin Source File
@@ -190,6 +194,10 @@ SOURCE=..\..\ares_timeout.c
 # Begin Source File
 
 SOURCE=..\..\ares_version.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_writev.c
 # End Source File
 # Begin Source File
 
@@ -233,7 +241,15 @@ SOURCE=..\..\ares_private.h
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\ares_strcasecmp.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\ares_version.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_writev.h
 # End Source File
 # Begin Source File
 

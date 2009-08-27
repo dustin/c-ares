@@ -1,5 +1,106 @@
   Changelog for the c-ares project
 
+* December 9 2008 (Gisle Vanem)
+
+  Fixes for Win32 targets using the Watt-32 tcp/ip stack.
+
+* Dec 4 2008 (Daniel Stenberg)
+
+  Gregor Jasny provided the patch that introduces ares_set_socket_callback(),
+  and I edited it to also get duped by ares_dup().
+
+* Dec 3 2008 (Daniel Stenberg)
+
+  API changes:
+
+  I made sure the public ares_config struct looks like before and yet it
+  supports the ROTATE option thanks to c-ares now storing the "optmask"
+  internally. Thus we should be ABI compatible with the past release(s)
+  now. My efforts mentioned below should not break backwards ABI compliance.
+
+  Here's how I suggest we proceed with the API:
+
+  ares_init() will be primary "channel creator" function.
+
+  ares_init_options() will continue to work exactly like now and before. For
+  starters, it will be the (only) way to set the existing options.
+
+  ares_save_options() will continue to work like today, but will ONLY save
+  options that you can set today (including ARES_OPT_ROTATE actually) but new
+  options that we add may not be saved with this.
+
+  Instead we introduce:
+
+  ares_dup() that instead can make a new channel and clone the config used
+  from an existing channel. It will then clone all config options, including
+  future new things we add.
+
+  ares_set_*() style functions that set (new) config options. As a start we
+  simply add these for new functionality, but over time we can also introduce
+  them for existing "struct ares_options" so that we can eventually deprecate
+  the two ares_*_options() functions.
+
+  ares_get_*() style functions for extracting info from a channel handle that
+  should be used instead of ares_save_options().
+
+* Nov 26 2008 (Yang Tse)
+- Brad Spencer provided changes to allow buildconf to work on OS X.
+
+- Gerald Combs fixed a bug in ares_parse_ptr_reply() which would cause a
+  buffer to shrink instead of expand if a reply contained 8 or more records.
+
+* Nov 25 2008 (Yang Tse)
+- In preparation for the upcomming IPv6 nameservers patch, the internal
+  ares_addr union is now changed into an internal struct which also holds
+  the address family.
+
+* Nov 19 2008 (Daniel Stenberg)
+- Brad Spencer brought the new function ares_gethostbyname_file() which simply
+  resolves a host name from the given file, using the regular hosts syntax.
+
+* Nov 1 2008 (Daniel Stenberg)
+- Carlo Contavalli added support for the glibc "rotate" option, as documented
+  in man resolv.conf:
+
+  causes round robin selection of nameservers from among those listed.  This
+  has the effect of spreading the query load among all listed servers, rather
+  than having all clients try the first listed server first every time.
+
+  You can enable it with ARES_OPT_ROTATE
+
+* Oct 21 2008 (Yang Tse)
+  Charles Hardin added handling of EINPROGRESS for UDP connects.
+
+* Oct 18 2008 (Daniel Stenberg)
+  Charles Hardin made adig support a regular numerical dotted IP address for the
+  -s option as well.
+
+* Oct 7 2008 (Yang Tse)
+- Added --enable-optimize configure option to enable and disable compiler
+  optimizations to allow decoupled setting from --enable-debug.
+
+* Oct 2 2008 (Yang Tse)
+- Added --enable-warnings configure option to enable and disable strict
+  compiler warnings to allow decoupled setting from --enable-debug.
+
+* Sep 17 2008 (Yang Tse)
+- Code reorganization to allow internal/private use of "nameser.h" to any
+  system that lacks arpa/nameser.h or arpa/nameser_compat.h header files.
+
+* Sep 16 2008 (Yang Tse)
+- Code reorganization to allow internal/private use of ares_writev to any
+  system that lacks the writev function.
+
+* Sep 15 2008 (Yang Tse)
+- Code reorganization to allow internal/private use of ares_strcasecmp to any
+  system that lacks the strcasecmp function.
+
+- Improve configure detection of some string functions.
+
+* Sep 11 2008 (Yang Tse)
+- Code reorganization to allow internal/private use of ares_strdup to any
+  system that lacks the strdup function.
+
 Version 1.5.3 (Aug 29, 2008)
 
 * Aug 25 2008 (Yang Tse)

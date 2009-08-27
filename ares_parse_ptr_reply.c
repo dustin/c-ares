@@ -1,4 +1,4 @@
-/* $Id: ares_parse_ptr_reply.c,v 1.13 2008-05-08 22:11:39 bagder Exp $ */
+/* $Id: ares_parse_ptr_reply.c,v 1.19 2008-11-26 17:04:35 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -17,19 +17,26 @@
 
 #include "setup.h"
 
-#if defined(WIN32) && !defined(WATT32)
-#include "nameser.h"
+#ifdef HAVE_SYS_SOCKET_H
+#  include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>
+#endif
+#ifdef HAVE_NETDB_H
+#  include <netdb.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#  include <arpa/nameser.h>
 #else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/nameser.h>
+#  include "nameser.h"
+#endif
 #ifdef HAVE_ARPA_NAMESER_COMPAT_H
-#include <arpa/nameser_compat.h>
+#  include <arpa/nameser_compat.h>
 #endif
-#endif
+
 #ifdef HAVE_STRINGS_H
-#include <strings.h>
+#  include <strings.h>
 #endif
 
 #include <stdlib.h>
@@ -48,6 +55,7 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
   char *ptrname, *hostname, *rr_name, *rr_data;
   struct hostent *hostent;
   int aliascnt = 0;
+  int alias_alloc = 8;
   char ** aliases;
 
   /* Set *host to NULL for all failure cases. */
@@ -77,7 +85,7 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 
   /* Examine each answer resource record (RR) in turn. */
   hostname = NULL;
-  aliases = (char **) malloc(8 * sizeof(char *));
+  aliases = malloc(alias_alloc * sizeof(char *));
   if (!aliases)
     {
       free(ptrname);
@@ -118,8 +126,16 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
             }
           strncpy(aliases[aliascnt], rr_data, strlen(rr_data)+1);
           aliascnt++;
-          if ((aliascnt%8)==0)
-            aliases = (char **) realloc(aliases, (aliascnt/16+1) * sizeof(char *));
+          if (aliascnt >= alias_alloc) {
+            char **ptr;
+            alias_alloc *= 2;
+            ptr = realloc(aliases, alias_alloc * sizeof(char *));
+            if(!ptr) {
+              status = ARES_ENOMEM;
+              break;
+            }
+            aliases = ptr;
+          }
         }
 
       if (rr_class == C_IN && rr_type == T_CNAME)

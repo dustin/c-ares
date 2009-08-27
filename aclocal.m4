@@ -7569,5 +7569,10 @@ AC_SUBST([am__tar])
 AC_SUBST([am__untar])
 ]) # _AM_PROG_TAR
 
+m4_include([m4/cares-compilers.m4])
+m4_include([m4/cares-confopts.m4])
+m4_include([m4/cares-functions.m4])
+m4_include([m4/cares-override.m4])
 m4_include([m4/cares-reentrant.m4])
+m4_include([m4/cares-system.m4])
 m4_include([acinclude.m4])

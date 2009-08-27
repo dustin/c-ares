@@ -1,9 +1,9 @@
-#ifndef __ARES_INET_NTOP_H
-#define __ARES_INET_NTOP_H
+#ifndef HEADER_CARES_WRITEV_H
+#define HEADER_CARES_WRITEV_H
 
-/* $Id: inet_ntop.h,v 1.4 2008-09-24 16:43:12 yangtse Exp $ */
+/* $Id: ares_writev.h,v 1.1 2008-09-16 16:42:48 yangtse Exp $ */
 
-/* Copyright (C) 2005 by Dominick Meglio
+/* Copyright 1998 by the Massachusetts Institute of Technology.
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -18,10 +18,20 @@
  * without express or implied warranty.
  */
 
-#ifdef HAVE_INET_NTOP
-#define ares_inet_ntop(w,x,y,z) inet_ntop(w,x,y,z)
-#else
-const char *ares_inet_ntop(int af, const void *src, char *dst, size_t size);
+#include "setup.h"
+#include "ares.h"
+
+#ifndef HAVE_WRITEV
+
+/* Structure for scatter/gather I/O. */
+struct iovec
+{
+  void *iov_base;  /* Pointer to data. */
+  size_t iov_len;  /* Length of data.  */
+};
+
+extern ssize_t ares_writev(ares_socket_t s, const struct iovec *iov, int iovcnt);
+
 #endif
 
-#endif /* __ARES_INET_NTOP_H */
+#endif /* HEADER_CARES_WRITEV_H */

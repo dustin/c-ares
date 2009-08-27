@@ -44,12 +44,17 @@ DIST_COMMON = README $(am__configure_deps) $(libcares_la_HEADERS) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/Makefile.inc $(srcdir)/config.h.in \
 	$(srcdir)/libcares.pc.in $(top_srcdir)/configure AUTHORS NEWS \
-	config.guess config.sub depcomp install-sh ltmain.sh missing \
-	mkinstalldirs
+	TODO config.guess config.sub depcomp install-sh ltmain.sh \
+	missing mkinstalldirs
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/cares-reentrant.m4 \
-	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/cares-compilers.m4 \
+	$(top_srcdir)/m4/cares-confopts.m4 \
+	$(top_srcdir)/m4/cares-functions.m4 \
+	$(top_srcdir)/m4/cares-override.m4 \
+	$(top_srcdir)/m4/cares-reentrant.m4 \
+	$(top_srcdir)/m4/cares-system.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -75,10 +80,11 @@ am__objects_1 = ares_fds.lo ares_getsock.lo ares_process.lo \
 	ares_gethostbyname.lo ares_strerror.lo ares_cancel.lo \
 	ares_init.lo ares_timeout.lo ares_destroy.lo ares_mkquery.lo \
 	ares_version.lo ares_expand_name.lo ares_parse_a_reply.lo \
-	windows_port.lo ares_expand_string.lo ares_parse_ptr_reply.lo \
-	ares_parse_aaaa_reply.lo ares_getnameinfo.lo inet_net_pton.lo \
-	bitncmp.lo inet_ntop.lo ares_parse_ns_reply.lo ares_llist.lo \
-	ares__timeval.lo
+	windows_port.lo ares_strdup.lo ares_expand_string.lo \
+	ares_parse_ptr_reply.lo ares_parse_aaaa_reply.lo \
+	ares_getnameinfo.lo inet_net_pton.lo bitncmp.lo inet_ntop.lo \
+	ares_writev.lo ares_parse_ns_reply.lo ares_llist.lo \
+	ares__timeval.lo ares_strcasecmp.lo
 am__objects_2 =
 am_libcares_la_OBJECTS = $(am__objects_1) $(am__objects_2)
 libcares_la_OBJECTS = $(am_libcares_la_OBJECTS)
@@ -186,6 +192,7 @@ PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
+PATH = @PATH@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANDOM_FILE = @RANDOM_FILE@
 RANLIB = @RANLIB@
@@ -273,7 +280,8 @@ MSVCFILES = vc/vc.dsw vc/acountry/acountry.dsp vc/adig/adig.dsp \
 # regular sources and headers
 EXTRA_DIST = AUTHORS CHANGES README.cares Makefile.inc Makefile.dj	   \
  Makefile.m32 Makefile.netware Makefile.vc6 $(man_MANS) $(MSVCFILES)	   \
- config-win32.h RELEASE-NOTES libcares.pc.in buildconf get_ver.awk maketgz
+ config-win32.h RELEASE-NOTES libcares.pc.in buildconf get_ver.awk maketgz \
+ TODO
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libcares.pc
@@ -314,14 +322,14 @@ ares_query.c ares__close_sockets.c ares_free_string.c ares_search.c	\
 ares__get_hostent.c ares_gethostbyaddr.c ares_send.c ares__read_line.c	\
 ares_gethostbyname.c ares_strerror.c ares_cancel.c ares_init.c		\
 ares_timeout.c ares_destroy.c ares_mkquery.c ares_version.c		\
-ares_expand_name.c ares_parse_a_reply.c windows_port.c			\
+ares_expand_name.c ares_parse_a_reply.c windows_port.c ares_strdup.c	\
 ares_expand_string.c ares_parse_ptr_reply.c ares_parse_aaaa_reply.c	\
-ares_getnameinfo.c inet_net_pton.c bitncmp.c inet_ntop.c		\
-ares_parse_ns_reply.c ares_llist.c ares__timeval.c
+ares_getnameinfo.c inet_net_pton.c bitncmp.c inet_ntop.c ares_writev.c	\
+ares_parse_ns_reply.c ares_llist.c ares__timeval.c ares_strcasecmp.c
 
 HHEADERS = ares.h ares_private.h setup.h ares_dns.h ares_version.h          \
-           nameser.h inet_net_pton.h inet_ntop.h ares_ipv6.h bitncmp.h      \
-           setup_once.h ares_llist.h
+ nameser.h inet_net_pton.h inet_ntop.h ares_ipv6.h bitncmp.h setup_once.h   \
+ ares_llist.h ares_strdup.h ares_strcasecmp.h ares_writev.h
 
 MANPAGES = ares_destroy.3 ares_expand_name.3 ares_expand_string.3 ares_fds.3 \
  ares_free_hostent.3 ares_free_string.3 ares_gethostbyaddr.3		    \
@@ -329,8 +337,9 @@ MANPAGES = ares_destroy.3 ares_expand_name.3 ares_expand_string.3 ares_fds.3 \
  ares_parse_a_reply.3 ares_parse_ptr_reply.3 ares_process.3		    \
  ares_query.3 ares_search.3 ares_send.3 ares_strerror.3 ares_timeout.3	    \
  ares_version.3 ares_cancel.3 ares_parse_aaaa_reply.3 ares_getnameinfo.3    \
- ares_getsock.3 ares_parse_ns_reply.3 \
- ares_destroy_options.3 ares_save_options.3
+ ares_getsock.3 ares_parse_ns_reply.3 ares_dup.3 \
+ ares_destroy_options.3 ares_save_options.3 ares_gethostbyname_file.3       \
+ ares_set_socket_callback.3
 
 
 # Makefile.inc provides the CSOURCES and HHEADERS defines
@@ -485,9 +494,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_query.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_search.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_send.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_strcasecmp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_strdup.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_strerror.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_timeout.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_version.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_writev.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bitncmp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inet_net_pton.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inet_ntop.Plo@am__quote@

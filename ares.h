@@ -1,7 +1,7 @@
-/* $Id: ares.h,v 1.40 2008-05-13 20:48:48 bagder Exp $ */
+/* $Id: ares.h,v 1.48 2008-12-04 12:53:03 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
- * Copyright (C) 2007 by Daniel Stenberg
+ * Copyright (C) 2007-2008 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -29,10 +29,11 @@
 
 #include <sys/types.h>
 
-#if defined(_AIX) || (defined(NETWARE) && defined(__NOVELL_LIBC__))
 /* HP-UX systems version 9, 10 and 11 lack sys/select.h and so does oldish
    libc5-based Linux systems. Only include it on system that are known to
    require it! */
+#if defined(_AIX) || defined(__NOVELL_LIBC__) || defined(__NetBSD__) || \
+    defined(__minix) || defined(__SYMBIAN32__) || defined(__INTEGRITY)
 #include <sys/select.h>
 #endif
 #if (defined(NETWARE) && !defined(__NOVELL_LIBC__))
@@ -51,8 +52,8 @@
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
 #else
-  #include <netinet/in.h>
   #include <sys/socket.h>
+  #include <netinet/in.h>
 #endif
 
 #ifdef  __cplusplus
@@ -114,6 +115,7 @@ extern "C" {
 #define ARES_OPT_SOCK_SNDBUF    (1 << 11)
 #define ARES_OPT_SOCK_RCVBUF    (1 << 12)
 #define ARES_OPT_TIMEOUTMS      (1 << 13)
+#define ARES_OPT_ROTATE         (1 << 14)
 
 /* Nameinfo flag values */
 #define ARES_NI_NOFQDN                  (1 << 0)
@@ -179,6 +181,23 @@ typedef void (*ares_sock_state_cb)(void *data,
 
 struct apattern;
 
+/* NOTE about the ares_options struct to users and developers.
+
+   This struct will remain looking like this. It will not be extended nor
+   shrunk in future releases, but all new options will be set by ares_set_*()
+   options instead of with the ares_init_options() function.
+
+   Eventually (in a galaxy far far away), all options will be settable by
+   ares_set_*() options and the ares_init_options() function will become
+   deprecated.
+
+   When new options are added to c-ares, they are not added to this
+   struct. And they are not "saved" with the ares_save_options() function but
+   instead we encourage the use of the ares_dup() function. Needless to say,
+   if you add config options to c-ares you need to make sure ares_dup()
+   duplicates this new option.
+
+ */
 struct ares_options {
   int flags;
   int timeout; /* in seconds or milliseconds, depending on options */
@@ -210,14 +229,21 @@ typedef void (*ares_host_callback)(void *arg, int status, int timeouts,
                                    struct hostent *hostent);
 typedef void (*ares_nameinfo_callback)(void *arg, int status, int timeouts,
                                        char *node, char *service);
+typedef int  (*ares_sock_create_callback)(ares_socket_t socket_fd,
+                                          int type, void *data);
 
 int ares_init(ares_channel *channelptr);
 int ares_init_options(ares_channel *channelptr, struct ares_options *options,
                       int optmask);
-int ares_save_options(ares_channel channel, struct ares_options *options, int *optmask);
+int ares_save_options(ares_channel channel, struct ares_options *options,
+                      int *optmask);
 void ares_destroy_options(struct ares_options *options);
+int ares_dup(ares_channel *dest, ares_channel src);
 void ares_destroy(ares_channel channel);
 void ares_cancel(ares_channel channel);
+void ares_set_socket_callback(ares_channel channel,
+                              ares_sock_create_callback callback,
+                              void *user_data);
 void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
                ares_callback callback, void *arg);
 void ares_query(ares_channel channel, const char *name, int dnsclass,
@@ -226,6 +252,8 @@ void ares_search(ares_channel channel, const char *name, int dnsclass,
                  int type, ares_callback callback, void *arg);
 void ares_gethostbyname(ares_channel channel, const char *name, int family,
                         ares_host_callback callback, void *arg);
+int ares_gethostbyname_file(ares_channel channel, const char *name,
+                            int family, struct hostent **host);
 void ares_gethostbyaddr(ares_channel channel, const void *addr, int addrlen,
                         int family, ares_host_callback callback, void *arg);
 void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa,
