@@ -26,7 +26,8 @@
 int ares_fds(ares_channel channel, fd_set *read_fds, fd_set *write_fds)
 {
   struct server_state *server;
-  int i, nfds;
+  ares_socket_t nfds;
+  int i;
 
   /* No queries, no file descriptors. */
   if (!channel->queries)
@@ -51,5 +52,5 @@ int ares_fds(ares_channel channel, fd_set *read_fds, fd_set *write_fds)
             nfds = server->tcp_socket + 1;
         }
     }
-  return nfds;
+  return (int)nfds;
 }

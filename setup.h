@@ -1,7 +1,7 @@
 #ifndef ARES_SETUP_H
 #define ARES_SETUP_H
 
-/* Copyright (C) 2004 by Daniel Stenberg et al
+/* Copyright (C) 2004 - 2005 by Daniel Stenberg et al
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -19,6 +19,7 @@
 #else
 /* simple work-around for now, for systems without configure support */
 #define ssize_t int
+#define socklen_t int
 #endif
 
 /* Recent autoconf versions define these symbols in config.h. We don't want
@@ -45,11 +46,11 @@ typedef int ares_socket_t;
 /* Assume a few thing unless they're set by configure
  */
 #if !defined(HAVE_SYS_TIME_H) && !defined(_MSC_VER)
-#define HAVE_SYS_TIME_H  
+#define HAVE_SYS_TIME_H
 #endif
 
 #if !defined(HAVE_UNISTD_H) && !defined(_MSC_VER)
-#define HAVE_UNISTD_H 
+#define HAVE_UNISTD_H 1
 #endif
 
 #if !defined(HAVE_SYS_UIO_H) && !defined(WIN32) && !defined(MSDOS)
@@ -67,6 +68,15 @@ int ares_strcasecmp(const char *s1, const char *s2);
    same */
 #define strncasecmp(a,b,c) ares_strncasecmp(a,b,c)
 #define strcasecmp(a,b) ares_strcasecmp(a,b)
+#endif
+
+/* IPv6 compatibility */
+#if !defined(HAVE_AF_INET6)
+#if defined(HAVE_PF_INET6)
+#define AF_INET6 PF_INET6
+#else
+#define AF_INET6 AF_MAX+1
+#endif
 #endif
 
 #endif /* ARES_SETUP_H */

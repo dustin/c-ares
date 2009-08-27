@@ -1,4 +1,4 @@
-/* $Id: ares_private.h,v 1.11 2004/10/06 07:50:18 bagder Exp $ */
+/* $Id: ares_private.h,v 1.19 2005/08/10 17:03:53 gknauf Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -33,6 +33,10 @@
 #define writev(s,v,c)     writev_s(s,v,c)
 #endif
 
+#ifdef NETWARE
+#include <time.h>
+#endif
+
 #define DEFAULT_TIMEOUT         5
 #define DEFAULT_TRIES           4
 #ifndef INADDR_NONE
@@ -41,7 +45,7 @@
 
 #if defined(WIN32) && !defined(WATT32)
 
-#define IsNT ((int)GetVersion()>0)
+#define IS_NT()        ((int)GetVersion() > 0)
 #define WIN_NS_9X      "System\\CurrentControlSet\\Services\\VxD\\MSTCP"
 #define WIN_NS_NT_KEY  "System\\CurrentControlSet\\Services\\Tcpip\\Parameters"
 #define NAMESERVER     "NameServer"
@@ -68,6 +72,8 @@
 #endif
 
 #endif
+
+#include "ares_ipv6.h"
 
 struct send_request {
   /* Remaining data to send */
@@ -124,9 +130,23 @@ struct query {
 };
 
 /* An IP address pattern; matches an IP address X if X & mask == addr */
+#define PATTERN_MASK 0x1
+#define PATTERN_CIDR 0x2
+
+union ares_addr {
+  struct in_addr addr4;
+  struct in6_addr addr6;
+};
+
 struct apattern {
-  struct in_addr addr;
-  struct in_addr mask;
+  union ares_addr addr;
+  union
+  {
+    union ares_addr addr;
+    unsigned short bits;
+  } mask;
+  int family;
+  unsigned short type;
 };
 
 struct ares_channeldata {
@@ -156,7 +176,7 @@ struct ares_channeldata {
 
 void ares__send_query(ares_channel channel, struct query *query, time_t now);
 void ares__close_sockets(struct server_state *server);
-int ares__get_hostent(FILE *fp, struct hostent **host);
+int ares__get_hostent(FILE *fp, int family, struct hostent **host);
 int ares__read_line(FILE *fp, char **buf, int *bufsize);
 
 #ifdef CURLDEBUG

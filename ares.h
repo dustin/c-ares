@@ -1,4 +1,4 @@
-/* $Id: ares.h,v 1.11 2004/10/06 07:50:18 bagder Exp $ */
+/* $Id: ares.h,v 1.15 2005/08/18 08:48:31 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -29,12 +29,18 @@
 
 #if defined(WATT32)
   #include <netinet/in.h>
+  #include <sys/socket.h>
   #include <tcp.h>
 #elif defined(WIN32)
   #include <winsock.h>
   #include <windows.h>
 #else
   #include <netinet/in.h>
+  #include <sys/socket.h>
+#endif
+
+#ifdef  __cplusplus
+extern "C" {
 #endif
 
 #define ARES_SUCCESS            0
@@ -60,6 +66,9 @@
 #define ARES_EDESTRUCTION       16
 #define ARES_EBADSTR            17
 
+/* ares_getnameinfo error codes */
+#define ARES_EBADFLAGS          18
+
 /* Flag values */
 #define ARES_FLAG_USEVC         (1 << 0)
 #define ARES_FLAG_PRIMARY       (1 << 1)
@@ -81,6 +90,24 @@
 #define ARES_OPT_DOMAINS        (1 << 7)
 #define ARES_OPT_LOOKUPS        (1 << 8)
 
+/* Nameinfo flag values */
+#define ARES_NI_NOFQDN                  (1 << 0)
+#define ARES_NI_NUMERICHOST             (1 << 1)
+#define ARES_NI_NAMEREQD                (1 << 2)
+#define ARES_NI_NUMERICSERV             (1 << 3)
+#define ARES_NI_DGRAM                   (1 << 4)
+#define ARES_NI_TCP                     0
+#define ARES_NI_UDP                     ARES_NI_DGRAM
+#define ARES_NI_SCTP                    (1 << 5)
+#define ARES_NI_DCCP                    (1 << 6)
+#define ARES_NI_NUMERICSCOPE            (1 << 7)
+#define ARES_NI_LOOKUPHOST              (1 << 8)
+#define ARES_NI_LOOKUPSERVICE           (1 << 9)
+/* Reserved for future use */
+#define ARES_NI_IDN                     (1 << 10)
+#define ARES_NI_ALLOW_UNASSIGNED        (1 << 11)
+#define ARES_NI_USE_STD3_ASCII_RULES    (1 << 12)
+
 struct ares_options {
   int flags;
   int timeout;
@@ -97,12 +124,15 @@ struct ares_options {
 
 struct hostent;
 struct timeval;
+struct sockaddr;
 struct ares_channeldata;
 typedef struct ares_channeldata *ares_channel;
 typedef void (*ares_callback)(void *arg, int status, unsigned char *abuf,
                               int alen);
 typedef void (*ares_host_callback)(void *arg, int status,
                                    struct hostent *hostent);
+typedef void (*ares_nameinfo_callback)(void *arg, int status,
+                                       char *node, char *service);
 
 int ares_init(ares_channel *channelptr);
 int ares_init_options(ares_channel *channelptr, struct ares_options *options,
@@ -119,7 +149,9 @@ void ares_gethostbyname(ares_channel channel, const char *name, int family,
                         ares_host_callback callback, void *arg);
 void ares_gethostbyaddr(ares_channel channel, const void *addr, int addrlen,
                         int family, ares_host_callback callback, void *arg);
-
+void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa,
+                      socklen_t salen, int flags, ares_nameinfo_callback callback,
+                      void *arg);
 int ares_fds(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
 struct timeval *ares_timeout(ares_channel channel, struct timeval *maxtv,
                              struct timeval *tv);
@@ -133,11 +165,16 @@ int ares_expand_string(const unsigned char *encoded, const unsigned char *abuf,
                      int alen, unsigned char **s, long *enclen);
 int ares_parse_a_reply(const unsigned char *abuf, int alen,
                        struct hostent **host);
+int ares_parse_aaaa_reply(const unsigned char *abuf, int alen,
+                       struct hostent **host);
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
                          int addrlen, int family, struct hostent **host);
 void ares_free_string(void *str);
 void ares_free_hostent(struct hostent *host);
 const char *ares_strerror(int code);
-void ares_free_errmem(char *mem);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif /* ARES__H */

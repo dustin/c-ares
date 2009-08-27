@@ -27,10 +27,17 @@
 #include <sys/time.h>
 #endif
 
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <arpa/nameser.h>
+#ifdef HAVE_ARPA_NAMESER_COMPAT_H
+#include <arpa/nameser_compat.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -44,6 +51,7 @@
 #include <errno.h>
 #include "ares.h"
 #include "ares_private.h"
+#include "inet_net_pton.h"
 
 #ifdef WATT32
 #undef WIN32  /* Redefined in MingW/MSVC headers */
@@ -54,19 +62,23 @@ static int init_by_options(ares_channel channel, struct ares_options *options,
 static int init_by_environment(ares_channel channel);
 static int init_by_resolv_conf(ares_channel channel);
 static int init_by_defaults(ares_channel channel);
+
+static int config_nameserver(struct server_state **servers, int *nservers,
+                             char *str);
+static int set_search(ares_channel channel, const char *str);
+static int set_options(ares_channel channel, const char *str);
+static const char *try_option(const char *p, const char *q, const char *opt);
+#ifndef WIN32
+static int sortlist_alloc(struct apattern **sortlist, int *nsort, struct apattern *pat);
+static int ip_addr(const char *s, int len, struct in_addr *addr);
+static void natural_mask(struct apattern *pat);
 static int config_domain(ares_channel channel, char *str);
 static int config_lookup(ares_channel channel, const char *str,
                          const char *bindch, const char *filech);
-static int config_nameserver(struct server_state **servers, int *nservers,
-                             char *str);
 static int config_sortlist(struct apattern **sortlist, int *nsort,
                            const char *str);
-static int set_search(ares_channel channel, const char *str);
-static int set_options(ares_channel channel, const char *str);
 static char *try_config(char *s, const char *opt);
-static const char *try_option(const char *p, const char *q, const char *opt);
-static int ip_addr(const char *s, int len, struct in_addr *addr);
-static void natural_mask(struct apattern *pat);
+#endif
 
 int ares_init(ares_channel *channelptr)
 {
@@ -264,7 +276,8 @@ static int get_res_nt(HKEY hKey, const char *subkey, char **obuf)
   if (!*obuf)
     return 0;
 
-  if (RegQueryValueEx(hKey, subkey, 0, NULL, *obuf, &size) != ERROR_SUCCESS)
+  if (RegQueryValueEx(hKey, subkey, 0, NULL,
+                      (LPBYTE)*obuf, &size) != ERROR_SUCCESS)
   {
     free(*obuf);
     return 0;
@@ -305,7 +318,8 @@ static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
 {
   FIXED_INFO    *fi   = alloca (sizeof(*fi));
   DWORD          size = sizeof (*fi);
-  DWORD (WINAPI *GetNetworkParams) (FIXED_INFO*, DWORD*);  /* available only on Win-98/2000+ */
+  typedef DWORD (WINAPI* get_net_param_func) (FIXED_INFO*, DWORD*);
+  get_net_param_func GetNetworkParams;  /* available only on Win-98/2000+ */
   HMODULE        handle;
   IP_ADDR_STRING *ipAddr;
   int            i, count = 0;
@@ -313,6 +327,7 @@ static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
   size_t         ip_size = sizeof("255.255.255.255,")-1;
   size_t         left = ret_size;
   char          *ret = ret_buf;
+  HRESULT        res;
 
   if (!fi)
      return (0);
@@ -321,11 +336,12 @@ static int get_iphlpapi_dns_info (char *ret_buf, size_t ret_size)
   if (!handle)
      return (0);
 
-  (void*)GetNetworkParams = GetProcAddress (handle, "GetNetworkParams");
+  GetNetworkParams = (get_net_param_func) GetProcAddress (handle, "GetNetworkParams");
   if (!GetNetworkParams)
      goto quit;
 
-  if ((*GetNetworkParams) (fi, &size) != ERROR_BUFFER_OVERFLOW)
+  res = (*GetNetworkParams) (fi, &size);
+  if ((res != ERROR_BUFFER_OVERFLOW) && (res != ERROR_SUCCESS))
      goto quit;
 
   fi = alloca (size);
@@ -375,7 +391,7 @@ quit:
 static int init_by_resolv_conf(ares_channel channel)
 {
   char *line = NULL;
-  int status, nservers = 0, nsort = 0;
+  int status = -1, nservers = 0, nsort = 0;
   struct server_state *servers = NULL;
   struct apattern *sortlist = NULL;
 
@@ -421,7 +437,7 @@ DhcpNameServer
       goto okay;
   }
 
-  if (IsNT)
+  if (IS_NT())
   {
     if (RegOpenKeyEx(
           HKEY_LOCAL_MACHINE, WIN_NS_NT_KEY, 0,
@@ -708,6 +724,7 @@ static int init_by_defaults(ares_channel channel)
   return ARES_SUCCESS;
 }
 
+#ifndef WIN32
 static int config_domain(ares_channel channel, char *str)
 {
   char *q;
@@ -747,6 +764,8 @@ static int config_lookup(ares_channel channel, const char *str,
   channel->lookups = strdup(lookups);
   return (channel->lookups) ? ARES_SUCCESS : ARES_ENOMEM;
 }
+
+#endif
 
 static int config_nameserver(struct server_state **servers, int *nservers,
                              char *str)
@@ -809,39 +828,74 @@ static int config_nameserver(struct server_state **servers, int *nservers,
   return ARES_SUCCESS;
 }
 
+#ifndef WIN32
 static int config_sortlist(struct apattern **sortlist, int *nsort,
                            const char *str)
 {
-  struct apattern pat, *newsort;
+  struct apattern pat;
   const char *q;
 
   /* Add sortlist entries. */
   while (*str && *str != ';')
     {
+      int bits;
+      char ipbuf[16], ipbufpfx[32];
+      /* Find just the IP */
       q = str;
       while (*q && *q != '/' && *q != ';' && !isspace((unsigned char)*q))
         q++;
-      if (ip_addr(str, (int)(q - str), &pat.addr) == 0)
+      memcpy(ipbuf, str, (int)(q-str));
+      ipbuf[(int)(q-str)] = 0;
+      /* Find the prefix */
+      if (*q == '/')
         {
-          /* We have a pattern address; now determine the mask. */
-          if (*q == '/')
+          const char *str2 = q+1;
+          while (*q && *q != ';' && !isspace((unsigned char)*q))
+            q++;
+          memcpy(ipbufpfx, str, (int)(q-str));
+          ipbufpfx[(int)(q-str)] = 0;
+          str = str2;
+        }
+      else
+        ipbufpfx[0] = 0;
+      /* Lets see if it is CIDR */
+      /* First we'll try IPv6 */
+      if ((bits = ares_inet_net_pton(AF_INET6, ipbufpfx ? ipbufpfx : ipbuf,
+                                     &pat.addr.addr6,
+                                     sizeof(pat.addr.addr6))) > 0)
+        {
+          pat.type = PATTERN_CIDR;
+          pat.mask.bits = bits;
+          pat.family = AF_INET6;
+          if (!sortlist_alloc(sortlist, nsort, &pat))
+            return ARES_ENOMEM;
+        }
+      if (ipbufpfx &&
+          (bits = ares_inet_net_pton(AF_INET, ipbufpfx, &pat.addr.addr4,
+                                     sizeof(pat.addr.addr4))) > 0)
+        {
+          pat.type = PATTERN_CIDR;
+          pat.mask.bits = bits;
+          pat.family = AF_INET;
+          if (!sortlist_alloc(sortlist, nsort, &pat))
+            return ARES_ENOMEM;
+        }
+      /* See if it is just a regular IP */
+      else if (ip_addr(ipbuf, (int)(q-str), &pat.addr.addr4) == 0)
+        {
+          if (ipbufpfx)
             {
-              str = q + 1;
-              while (*q && *q != ';' && !isspace((unsigned char)*q))
-                q++;
-              if (ip_addr(str, (int)(q - str), &pat.mask) != 0)
+              memcpy(ipbuf, str, (int)(q-str));
+              ipbuf[(int)(q-str)] = 0;
+              if (ip_addr(ipbuf, (int)(q - str), &pat.mask.addr.addr4) != 0)
                 natural_mask(&pat);
             }
           else
             natural_mask(&pat);
-
-          /* Add this pattern to our list. */
-          newsort = realloc(*sortlist, (*nsort + 1) * sizeof(struct apattern));
-          if (!newsort)
+          pat.family = AF_INET;
+          pat.type = PATTERN_MASK;
+          if (!sortlist_alloc(sortlist, nsort, &pat))
             return ARES_ENOMEM;
-          newsort[*nsort] = pat;
-          *sortlist = newsort;
-          (*nsort)++;
         }
       else
         {
@@ -855,6 +909,7 @@ static int config_sortlist(struct apattern **sortlist, int *nsort,
 
   return ARES_SUCCESS;
 }
+#endif
 
 static int set_search(ares_channel channel, const char *str)
 {
@@ -936,6 +991,7 @@ static int set_options(ares_channel channel, const char *str)
   return ARES_SUCCESS;
 }
 
+#ifndef WIN32
 static char *try_config(char *s, const char *opt)
 {
   size_t len;
@@ -949,21 +1005,34 @@ static char *try_config(char *s, const char *opt)
   return s;
 }
 
+#endif
+
 static const char *try_option(const char *p, const char *q, const char *opt)
 {
   size_t len = strlen(opt);
   return ((size_t)(q - p) > len && !strncmp(p, opt, len)) ? &p[len] : NULL;
 }
 
-static int ip_addr(const char *s, int len, struct in_addr *addr)
+#ifndef WIN32
+static int sortlist_alloc(struct apattern **sortlist, int *nsort,
+                          struct apattern *pat)
 {
-  char ipbuf[16];
+  struct apattern *newsort;
+  newsort = realloc(*sortlist, (*nsort + 1) * sizeof(struct apattern));
+  if (!newsort)
+    return 0;
+  newsort[*nsort] = *pat;
+  *sortlist = newsort;
+  (*nsort)++;
+  return 1;
+}
+
+static int ip_addr(const char *ipbuf, int len, struct in_addr *addr)
+{
 
   /* Four octets and three periods yields at most 15 characters. */
   if (len > 15)
     return -1;
-  memcpy(ipbuf, s, len);
-  ipbuf[len] = 0;
 
   addr->s_addr = inet_addr(ipbuf);
   if (addr->s_addr == INADDR_NONE && strcmp(ipbuf, "255.255.255.255") != 0)
@@ -978,15 +1047,16 @@ static void natural_mask(struct apattern *pat)
   /* Store a host-byte-order copy of pat in a struct in_addr.  Icky,
    * but portable.
    */
-  addr.s_addr = ntohl(pat->addr.s_addr);
+  addr.s_addr = ntohl(pat->addr.addr4.s_addr);
 
   /* This is out of date in the CIDR world, but some people might
    * still rely on it.
    */
   if (IN_CLASSA(addr.s_addr))
-    pat->mask.s_addr = htonl(IN_CLASSA_NET);
+    pat->mask.addr.addr4.s_addr = htonl(IN_CLASSA_NET);
   else if (IN_CLASSB(addr.s_addr))
-    pat->mask.s_addr = htonl(IN_CLASSB_NET);
+    pat->mask.addr.addr4.s_addr = htonl(IN_CLASSB_NET);
   else
-    pat->mask.s_addr = htonl(IN_CLASSC_NET);
+    pat->mask.addr.addr4.s_addr = htonl(IN_CLASSC_NET);
 }
+#endif

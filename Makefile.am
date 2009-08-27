@@ -12,10 +12,10 @@ MSVCFILES = vc/adig/adig.dep vc/adig/adig.dsp vc/adig/adig.mak	\
 # adig and ahost are just sample programs and thus not mentioned with the
 # regular sources and headers
 EXTRA_DIST = CHANGES README.cares Makefile.inc adig.c ahost.c $(man_MANS) \
- $(MSVCFILES)
+ $(MSVCFILES) AUTHORS
 
 
-VER=-version-info 0:0:0
+VER=-version-info 1:0:0
 # This flag accepts an argument of the form current[:revision[:age]]. So,
 # passing -version-info 3:12:1 sets current to 3, revision to 12, and age to
 # 1.
@@ -55,3 +55,12 @@ libcares_la_SOURCES = $(CSOURCES) $(HHEADERS)
 libcares_ladir = $(includedir)
 # what headers to install on 'make install':
 libcares_la_HEADERS = ares.h ares_version.h
+
+# Make files named *.dist replace the file without .dist extension
+dist-hook:
+	find $(distdir) -name "*.dist" -exec rm {} \;
+	(distit=`find $(srcdir) -name "*.dist"`; \
+	for file in $$distit; do \
+	  strip=`echo $$file | sed -e s/^$(srcdir)// -e s/\.dist//`; \
+	  cp $$file $(distdir)$$strip; \
+	done)
