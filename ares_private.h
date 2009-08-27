@@ -1,4 +1,4 @@
-/* $Id: ares_private.h,v 1.19 2005/08/10 17:03:53 gknauf Exp $ */
+/* $Id: ares_private.h,v 1.21 2006-05-03 06:11:44 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -61,6 +61,10 @@
 
 #define PATH_RESOLV_CONF "sys:/etc/resolv.cfg"
 #define PATH_HOSTS              "sys:/etc/hosts"
+
+#elif defined(__riscos__)
+
+#define PATH_HOSTS             "InetDBase:Hosts"
 
 #else
 
@@ -172,12 +176,21 @@ struct ares_channeldata {
 
   /* Active queries */
   struct query *queries;
+
+  ares_sock_state_cb sock_state_cb;
+  void *sock_state_cb_data;
 };
 
 void ares__send_query(ares_channel channel, struct query *query, time_t now);
-void ares__close_sockets(struct server_state *server);
+void ares__close_sockets(ares_channel channel, struct server_state *server);
 int ares__get_hostent(FILE *fp, int family, struct hostent **host);
 int ares__read_line(FILE *fp, char **buf, int *bufsize);
+
+#define SOCK_STATE_CALLBACK(c, s, r, w)                                 \
+  do {                                                                  \
+    if ((c)->sock_state_cb)                                             \
+      (c)->sock_state_cb((c)->sock_state_cb_data, (s), (r), (w));       \
+  } while (0)
 
 #ifdef CURLDEBUG
 /* This is low-level hard-hacking memory leak tracking and similar. Using the

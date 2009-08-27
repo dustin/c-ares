@@ -1,3 +1,5 @@
+/* $Id: ares_getnameinfo.c,v 1.14 2005/12/11 23:37:59 yangtse Exp $ */
+
 /* Copyright 2005 by Dominick Meglio
  *
  * Permission to use, copy, modify, and distribute this
@@ -68,17 +70,19 @@ struct nameinfo_query {
 #endif
 
 static void nameinfo_callback(void *arg, int status, struct hostent *host);
-static char *lookup_service(unsigned short port, int flags, char *buf);
+static char *lookup_service(unsigned short port, int flags,
+                            char *buf, size_t buflen);
 #ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-static char *append_scopeid(struct sockaddr_in6 *addr6, unsigned int scopeid, char *buf);
+static void append_scopeid(struct sockaddr_in6 *addr6, unsigned int scopeid,
+                           char *buf, size_t buflen);
 #endif
 static char *ares_striendstr(const char *s1, const char *s2);
 
 void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t salen,
                       int flags, ares_nameinfo_callback callback, void *arg)
 {
-  struct sockaddr_in *addr;
-  struct sockaddr_in6 *addr6;
+  struct sockaddr_in *addr = NULL;
+  struct sockaddr_in6 *addr6 = NULL;
   struct nameinfo_query *niquery;
 
   /* Verify the buffer size */
@@ -106,7 +110,7 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
         port = addr->sin_port;
       else
         port = addr6->sin6_port;
-      service = lookup_service(port, flags, buf);
+      service = lookup_service(port, flags, buf, sizeof(buf));
       callback(arg, ARES_SUCCESS, NULL, service);
       return;
     }
@@ -119,11 +123,11 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
       {
         unsigned int port = 0;
         char ipbuf[IPBUFSIZ];
-        char srvbuf[32];
+        char srvbuf[33];
         char *service = NULL;
         ipbuf[0] = 0;
 
-        /* Specifying not to lookup a host, but then saying a host 
+        /* Specifying not to lookup a host, but then saying a host
          * is required has to be illegal.
          */
         if (flags & ARES_NI_NAMEREQD)
@@ -137,7 +141,7 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
             port = addr6->sin6_port;
             /* If the system supports scope IDs, use it */
 #ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-            append_scopeid(addr6, flags, ipbuf);
+            append_scopeid(addr6, flags, ipbuf, sizeof(ipbuf));
 #endif
           }
         else
@@ -147,7 +151,7 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
           }
         /* They also want a service */
         if (flags & ARES_NI_LOOKUPSERVICE)
-          service = lookup_service(port, flags, srvbuf);
+          service = lookup_service(port, flags, srvbuf, sizeof(srvbuf));
         callback(arg, ARES_SUCCESS, ipbuf, service);
         return;
       }
@@ -163,18 +167,18 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
         niquery->callback = callback;
         niquery->arg = arg;
         niquery->flags = flags;
-        if (sa->sa_family == AF_INET) 
+        if (sa->sa_family == AF_INET)
           {
             niquery->family = AF_INET;
             memcpy(&niquery->addr.addr4, addr, sizeof(addr));
-            ares_gethostbyaddr(channel, &addr->sin_addr, sizeof(struct in_addr), AF_INET, 
+            ares_gethostbyaddr(channel, &addr->sin_addr, sizeof(struct in_addr), AF_INET,
                                nameinfo_callback, niquery);
           }
         else
           {
             niquery->family = AF_INET6;
             memcpy(&niquery->addr.addr6, addr6, sizeof(addr6));
-            ares_gethostbyaddr(channel, &addr6->sin6_addr, sizeof(struct in6_addr), AF_INET6, 
+            ares_gethostbyaddr(channel, &addr6->sin6_addr, sizeof(struct in6_addr), AF_INET6,
                                nameinfo_callback, niquery);
           }
       }
@@ -194,9 +198,11 @@ static void nameinfo_callback(void *arg, int status, struct hostent *host)
       if (niquery->flags & ARES_NI_LOOKUPSERVICE)
         {
           if (niquery->family == AF_INET)
-            service = lookup_service(niquery->addr.addr4.sin_port, niquery->flags, srvbuf);
+            service = lookup_service(niquery->addr.addr4.sin_port,
+                                     niquery->flags, srvbuf, sizeof(srvbuf));
           else
-            service = lookup_service(niquery->addr.addr6.sin6_port, niquery->flags, srvbuf);
+            service = lookup_service(niquery->addr.addr6.sin6_port,
+                                     niquery->flags, srvbuf, sizeof(srvbuf));
         }
       /* NOFQDN means we have to strip off the domain name portion.
          We do this by determining our own domain name, then searching the string
@@ -212,7 +218,7 @@ static void nameinfo_callback(void *arg, int status, struct hostent *host)
                char *end = ares_striendstr(host->h_name, domain);
                if (end)
                  *end = 0;
-             }        
+             }
         }
       niquery->callback(niquery->arg, ARES_SUCCESS, host->h_name, service);
       return;
@@ -227,16 +233,18 @@ static void nameinfo_callback(void *arg, int status, struct hostent *host)
         {
           ares_inet_ntop(AF_INET6, &niquery->addr.addr6.sin6_addr, ipbuf, IPBUFSIZ);
 #ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-          append_scopeid(&niquery->addr.addr6, niquery->flags, ipbuf);
+          append_scopeid(&niquery->addr.addr6, niquery->flags, ipbuf, sizeof(ipbuf));
 #endif
         }
       /* They want a service too */
       if (niquery->flags & ARES_NI_LOOKUPSERVICE)
         {
           if (niquery->family == AF_INET)
-            service = lookup_service(niquery->addr.addr4.sin_port, niquery->flags, srvbuf);
+            service = lookup_service(niquery->addr.addr4.sin_port,
+                                     niquery->flags, srvbuf, sizeof(srvbuf));
           else
-            service = lookup_service(niquery->addr.addr6.sin6_port, niquery->flags, srvbuf);
+            service = lookup_service(niquery->addr.addr6.sin6_port,
+                                     niquery->flags, srvbuf, sizeof(srvbuf));
         }
       niquery->callback(niquery->arg, ARES_SUCCESS, ipbuf, service);
       return;
@@ -245,18 +253,22 @@ static void nameinfo_callback(void *arg, int status, struct hostent *host)
   free(niquery);
 }
 
-static char *lookup_service(unsigned short port, int flags, char *buf)
+static char *lookup_service(unsigned short port, int flags,
+                            char *buf, size_t buflen)
 {
+  const char *proto;
+  struct servent *sep;
+#ifdef HAVE_GETSERVBYPORT_R
+  struct servent se;
+#endif
+  char tmpbuf[4096];
+
   if (port)
-    {
-      /* Just return the port as a string */
+    { 
       if (flags & ARES_NI_NUMERICSERV)
-        sprintf(buf, "%u", ntohs(port));
+        sep = NULL;
       else
-        {
-          struct servent *se;
-          const char *proto;
- 
+        { 
           if (flags & ARES_NI_UDP)
             proto = "udp";
           else if (flags & ARES_NI_SCTP)
@@ -265,39 +277,78 @@ static char *lookup_service(unsigned short port, int flags, char *buf)
             proto = "dccp";
           else
             proto = "tcp";
-          se = getservbyport(port, proto);
-          if (se && se->s_name)
-            strcpy(buf, se->s_name);
-          else
-            sprintf(buf, "%u", ntohs(port));
-        }
+#ifdef HAVE_GETSERVBYPORT_R
+          sep = &se;
+          memset(tmpbuf, 0, sizeof(tmpbuf));
+#if GETSERVBYPORT_R_ARGS == 6
+          if (getservbyport_r(port, proto, &se, (void *)tmpbuf, sizeof(tmpbuf), &sep) != 0)
+            sep = NULL;
+#elif GETSERVBYPORT_R_ARGS == 5
+          sep = getservbyport_r(port, proto, &se, (void *)tmpbuf, sizeof(tmpbuf));
+#elif GETSERVBYPORT_R_ARGS == 4
+          if (getservbyport_r(port, proto, &se, (void *)tmpbuf) != 0)
+            sep = NULL;
+#else     
+          /* Lets just hope the OS uses TLS! */
+          sep = getservbyport(port, proto);
+#endif    
+#else     
+          /* Lets just hope the OS uses TLS! */
+          sep = getservbyport(port, proto);
+#endif    
+        } 
+      if (sep && sep->s_name)
+        /* get service name */
+        strcpy(tmpbuf, sep->s_name);
+      else
+        /* get port as a string */
+        sprintf(tmpbuf, "%u", ntohs(port));
+      if (strlen(tmpbuf) < buflen)
+        /* return it if buffer big enough */
+        strcpy(buf, tmpbuf);
+      else
+        /* avoid reusing previous one */
+        buf[0] = '\0';
       return buf;
     }
+  buf[0] = '\0';
   return NULL;
 }
 
 #ifdef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
-static char *append_scopeid(struct sockaddr_in6 *addr6, unsigned int flags, char *buf)
+static void append_scopeid(struct sockaddr_in6 *addr6, unsigned int flags,
+                           char *buf, size_t buflen)
 {
-  char tmpbuf[IF_NAMESIZE + 1];
+  char fmt_u[] = "%u";
+  char fmt_lu[] = "%lu";
+  char tmpbuf[IF_NAMESIZE + 2];
+  size_t bufl;
+  char *fmt = (sizeof(addr6->sin6_scope_id) > sizeof(unsigned int))?fmt_lu:fmt_u;
 
   tmpbuf[0] = '%';
+
 #ifdef HAVE_IF_INDEXTONAME
-  if ((flags & ARES_NI_NUMERICSCOPE) || (!IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)
-      && !IN6_IS_ADDR_MC_LINKLOCAL(&addr6->sin6_addr)))
+  if ((flags & ARES_NI_NUMERICSCOPE) ||
+      (!IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)
+       && !IN6_IS_ADDR_MC_LINKLOCAL(&addr6->sin6_addr)))
     {
-       sprintf(&tmpbuf[1], "%u", addr6->sin6_scope_id);
+       sprintf(&tmpbuf[1], fmt, addr6->sin6_scope_id);
     }
   else
     {
       if (if_indextoname(addr6->sin6_scope_id, &tmpbuf[1]) == NULL)
-        sprintf(&tmpbuf[1], "%u", addr6->sin6_scope_id);
+        sprintf(&tmpbuf[1], fmt, addr6->sin6_scope_id);
     }
 #else
-  sprintf(&tmpbuf[1], "%u", addr6->sin6_scope_id);
+  sprintf(&tmpbuf[1], fmt, addr6->sin6_scope_id);
+  (void) flags;
 #endif
-  strcat(buf, tmpbuf);
-  return buf;
+  tmpbuf[IF_NAMESIZE + 1] = '\0';
+  bufl = strlen(buf);
+
+  if(bufl + strlen(tmpbuf) < buflen)
+    /* only append the scopeid string if it fits in the target buffer */
+    strcpy(&buf[bufl], tmpbuf);
 }
 #endif
 

@@ -30,6 +30,8 @@
 #ifdef HAVE_ARPA_NAMESER_COMPAT_H
 #include <arpa/nameser_compat.h>
 #endif
+#endif /* WIN32 && !WATT32 */
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -38,7 +40,6 @@
 #endif
 #ifdef NETWARE
 #include <sys/filio.h>
-#endif
 #endif
 
 #include <string.h>
@@ -62,6 +63,7 @@
 #define GET_ERRNO()  errno
 #endif
 
+static int try_again(int errnum);
 static void write_tcp_data(ares_channel channel, fd_set *write_fds,
                            time_t now);
 static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now);
@@ -93,6 +95,31 @@ void ares_process(ares_channel channel, fd_set *read_fds, fd_set *write_fds)
   process_timeouts(channel, now);
 }
 
+/* Return 1 if the specified errno describes a readiness error, or 0
+ * otherwise. This is mostly for HP-UX, which could return EAGAIN or
+ * EWOULDBLOCK. See this man page
+ *
+ * 	http://devrsrc1.external.hp.com/STKS/cgi-bin/man2html?manpage=/usr/share/man/man2.Z/send.2
+ */
+static int try_again(int errnum)
+{
+#if !defined EWOULDBLOCK && !defined EAGAIN
+#error "Neither EWOULDBLOCK nor EAGAIN defined"
+#endif
+  switch (errnum)
+    {
+#ifdef EWOULDBLOCK
+    case EWOULDBLOCK:
+      return 1;
+#endif
+#if defined EAGAIN && EAGAIN != EWOULDBLOCK
+    case EAGAIN:
+      return 1;
+#endif
+    }
+  return 0;
+}
+
 /* If any TCP sockets select true for writing, write out queued data
  * we have for them.
  */
@@ -103,7 +130,7 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
   struct iovec *vec;
   int i;
   ssize_t scount;
-  int wcount;
+  ssize_t wcount;
   size_t n;
 
   for (i = 0; i < channel->nservers; i++)
@@ -135,7 +162,8 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
           free(vec);
           if (wcount < 0)
             {
-              handle_error(channel, i, now);
+              if (!try_again(GET_ERRNO()))
+                  handle_error(channel, i, now);
               continue;
             }
 
@@ -148,7 +176,10 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
                   wcount -= sendreq->len;
                   server->qhead = sendreq->next;
                   if (server->qhead == NULL)
-                    server->qtail = NULL;
+                    {
+                      SOCK_STATE_CALLBACK(channel, server->tcp_socket, 1, 0);
+                      server->qtail = NULL;
+                    }
                   free(sendreq);
                 }
               else
@@ -164,11 +195,13 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
           /* Can't allocate iovecs; just send the first request. */
           sendreq = server->qhead;
 
-          scount = send(server->tcp_socket, sendreq->data, sendreq->len, 0);
+          scount = send(server->tcp_socket, (void *)sendreq->data,
+                        sendreq->len, 0);
 
           if (scount < 0)
             {
-              handle_error(channel, i, now);
+              if (!try_again(GET_ERRNO()))
+                  handle_error(channel, i, now);
               continue;
             }
 
@@ -177,7 +210,10 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
             {
               server->qhead = sendreq->next;
               if (server->qhead == NULL)
-                server->qtail = NULL;
+                {
+                  SOCK_STATE_CALLBACK(channel, server->tcp_socket, 1, 0);
+                  server->qtail = NULL;
+                }
               free(sendreq);
             }
           else
@@ -212,11 +248,12 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
            * what's left to read of it).
            */
           count = recv(server->tcp_socket,
-                       server->tcp_lenbuf + server->tcp_buffer_pos,
-                       2 - server->tcp_buffer_pos, 0);
+                       (void *)(server->tcp_lenbuf + server->tcp_lenbuf_pos),
+                       2 - server->tcp_lenbuf_pos, 0);
           if (count <= 0)
             {
-              handle_error(channel, i, now);
+              if (!(count == -1 && try_again(GET_ERRNO())))
+                  handle_error(channel, i, now);
               continue;
             }
 
@@ -238,11 +275,12 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
         {
           /* Read data into the allocated buffer. */
           count = recv(server->tcp_socket,
-                       server->tcp_buffer + server->tcp_buffer_pos,
+                       (void *)(server->tcp_buffer + server->tcp_buffer_pos),
                        server->tcp_length - server->tcp_buffer_pos, 0);
           if (count <= 0)
             {
-              handle_error(channel, i, now);
+              if (!(count == -1 && try_again(GET_ERRNO())))
+                  handle_error(channel, i, now);
               continue;
             }
 
@@ -280,8 +318,10 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
           !FD_ISSET(server->udp_socket, read_fds))
         continue;
 
-      count = recv(server->udp_socket, buf, sizeof(buf), 0);
-      if (count <= 0)
+      count = recv(server->udp_socket, (void *)buf, sizeof(buf), 0);
+      if (count == -1 && try_again(GET_ERRNO()))
+        continue;
+      else if (count <= 0)
         handle_error(channel, i, now);
 
       process_answer(channel, buf, count, i, 0, now);
@@ -378,7 +418,7 @@ static void handle_error(ares_channel channel, int whichserver, time_t now)
   struct query *query, *next;
 
   /* Reset communications with this server. */
-  ares__close_sockets(&channel->servers[whichserver]);
+  ares__close_sockets(channel, &channel->servers[whichserver]);
 
   /* Tell all queries talking to this server to move on and not try
    * this server again.
@@ -450,7 +490,10 @@ void ares__send_query(ares_channel channel, struct query *query, time_t now)
       if (server->qtail)
         server->qtail->next = sendreq;
       else
-        server->qhead = sendreq;
+        {
+          SOCK_STATE_CALLBACK(channel, server->tcp_socket, 1, 1);
+          server->qhead = sendreq;
+        }
       server->qtail = sendreq;
       query->timeout = 0;
     }
@@ -465,8 +508,10 @@ void ares__send_query(ares_channel channel, struct query *query, time_t now)
               return;
             }
         }
-      if (send(server->udp_socket, query->qbuf, query->qlen, 0) == -1)
+      if (send(server->udp_socket, (void *)query->qbuf,
+               query->qlen, 0) == -1)
         {
+          /* FIXME: Handle EAGAIN here since it likely can happen. */
           query->skip_server[query->server] = 1;
           next_server(channel, query, now);
           return;
@@ -572,6 +617,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
     }
   }
 
+  SOCK_STATE_CALLBACK(channel, s, 1, 0);
   server->tcp_buffer_pos = 0;
   server->tcp_socket = s;
   return 0;
@@ -600,6 +646,8 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
       closesocket(s);
       return -1;
     }
+
+  SOCK_STATE_CALLBACK(channel, s, 1, 0);
 
   server->udp_socket = s;
   return 0;
@@ -711,7 +759,7 @@ static struct query *end_query (ares_channel channel, struct query *query, int s
   if (!channel->queries && !(channel->flags & ARES_FLAG_STAYOPEN))
     {
       for (i = 0; i < channel->nservers; i++)
-        ares__close_sockets(&channel->servers[i]);
+        ares__close_sockets(channel, &channel->servers[i]);
     }
   return (next);
 }

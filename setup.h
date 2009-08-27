@@ -1,5 +1,5 @@
-#ifndef ARES_SETUP_H
-#define ARES_SETUP_H
+#ifndef __ARES_SETUP_H
+#define __ARES_SETUP_H
 
 /* Copyright (C) 2004 - 2005 by Daniel Stenberg et al
  *
@@ -14,17 +14,79 @@
  * without express or implied warranty.
  */
 
+#if !defined(WIN32) && defined(__WIN32__)
+/* Borland fix */
+#define WIN32
+#endif
+
+#if !defined(WIN32) && defined(_WIN32)
+/* VS2005 on x64 fix */
+#define WIN32
+#endif
+
+/*
+ * Include configuration script results or hand-crafted
+ * configuration file for platforms which lack config tool.
+ */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #else
-/* simple work-around for now, for systems without configure support */
+
+#ifdef WIN32
+#include "config-win32.h"
+#endif
+
+#endif /* HAVE_CONFIG_H */
+
+/*
+ * Include header files for windows builds before redefining anything.
+ * Use this preproessor block only to include or exclude windows.h,
+ * winsock2.h, ws2tcpip.h or winsock.h. Any other windows thing belongs
+ * to any other further and independant block.
+ */
+
+#ifdef HAVE_WINDOWS_H
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  ifdef HAVE_WINSOCK2_H
+#    include <winsock2.h>
+#    ifdef HAVE_WS2TCPIP_H
+#       include <ws2tcpip.h>
+#    endif
+#  else
+#    ifdef HAVE_WINSOCK_H
+#      include <winsock.h>
+#    endif
+#  endif
+#endif
+
+/*
+ * Work-arounds for systems without configure support
+ */
+
+#ifndef HAVE_CONFIG_H
+
+#if defined(__DJGPP__) || (defined(__WATCOMC__) && (__WATCOMC__ >= 1240)) || \
+    defined(__POCC__)
+#else
 #define ssize_t int
+#endif
+
+#ifndef HAVE_WS2TCPIP_H
 #define socklen_t int
 #endif
 
-/* Recent autoconf versions define these symbols in config.h. We don't want
-   them (since they collide with the libcurl ones when we build
-   --enable-debug) so we undef them again here. */
+#endif /* HAVE_CONFIG_H */
+
+/*
+ * Recent autoconf versions define these symbols in config.h. We don't
+ * want them (since they collide with the libcurl ones when we build
+ *  --enable-debug) so we undef them again here.
+ */
+
 #undef PACKAGE_STRING
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
@@ -33,9 +95,11 @@
 #undef VERSION
 #undef PACKAGE
 
-/* now typedef our socket type */
+/*
+ * Typedef our socket type
+ */
+
 #if defined(WIN32) && !defined(WATT32)
-#include <winsock.h>
 typedef SOCKET ares_socket_t;
 #define ARES_SOCKET_BAD INVALID_SOCKET
 #else
@@ -43,8 +107,10 @@ typedef int ares_socket_t;
 #define ARES_SOCKET_BAD -1
 #endif
 
-/* Assume a few thing unless they're set by configure
+/*
+ * Assume a few thing unless they're set by configure
  */
+
 #if !defined(HAVE_SYS_TIME_H) && !defined(_MSC_VER)
 #define HAVE_SYS_TIME_H
 #endif
@@ -58,7 +124,7 @@ typedef int ares_socket_t;
 #endif
 
 #if (defined(WIN32) || defined(WATT32)) && \
-   !(defined(__MINGW32__) || defined(NETWARE))
+   !(defined(__MINGW32__) || defined(NETWARE) || defined(__DJGPP__))
 /* protos for the functions we provide in windows_port.c */
 int ares_strncasecmp(const char *s1, const char *s2, int n);
 int ares_strcasecmp(const char *s1, const char *s2);
@@ -79,4 +145,4 @@ int ares_strcasecmp(const char *s1, const char *s2);
 #endif
 #endif
 
-#endif /* ARES_SETUP_H */
+#endif /* __ARES_SETUP_H */

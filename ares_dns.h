@@ -1,4 +1,4 @@
-/* $Id: ares_dns.h,v 1.2 2004/10/06 07:50:18 bagder Exp $ */
+/* $Id: ares_dns.h,v 1.5 2006-06-19 06:41:55 wahern Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -27,6 +27,15 @@
                                          ((p)[1] = ((v) >> 16) & 0xff), \
                                          ((p)[2] = ((v) >> 8) & 0xff), \
                                          ((p)[3] = (v) & 0xff))
+
+#if 0
+/* we cannot use this approach on systems where we can't access 16/32 bit
+   data on un-aligned addresses */
+#define DNS__16BIT(p)                   ntohs(*(unsigned short*)(p))
+#define DNS__32BIT(p)                   ntohl(*(unsigned long*)(p))
+#define DNS__SET16BIT(p, v)             *(unsigned short*)(p) = htons(v)
+#define DNS__SET32BIT(p, v)             *(unsigned long*)(p) = htonl(v)
+#endif
 
 /* Macros for parsing a DNS header */
 #define DNS_HEADER_QID(h)               DNS__16BIT(h)

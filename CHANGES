@@ -1,6 +1,73 @@
   Changelog for the c-ares project
 
-Version 1.3.0 (August 29, 2004)
+Version 1.3.1 (June 24, 2006)
+
+* June 19, 2006
+
+- (wahern) Removed "big endian" DNS section and RR data integer parser
+  macros from ares_dns.h, which break c-ares on my Sparc64. Bit-wise
+  operations in C operate on logical values. And in any event the octets are
+  already in big-endian (aka network) byte order so they're being reversed
+  (thus the source of the breakage).
+
+* June 18, 2006
+
+- William Ahern handles EAGAIN/EWOULDBLOCK errors in most of the I/O calls
+  from area_process.c.
+
+  TODO: Handle one last EAGAIN for a UDP socket send(2) in
+  ares__send_query().
+
+* May 10, 2006
+
+- Bram Matthys brought my attention to a libtool peculiarity where detecting
+  things such as C++ compiler actually is a bad thing and since we don't need
+  that detection I added a work-around, much inspired by a previous patch by
+  Paolo Bonzini. This also shortens the configure script quite a lot.
+
+* May 3, 2006
+
+- Nick Mathewson added the ARES_OPT_SOCK_STATE_CB option that when set makes
+  c-ares call a callback on socket state changes. A better way than the
+  ares_getsock() to get full control over the socket state.
+
+* January 9, 2006
+
+- Alexander Lazic improved the getservbyport_r() configure check.
+
+* January 6, 2006
+
+- Alexander Lazic pointed out that the buildconf should use the ACLOCAL_FLAGS
+  variable for easier controlling what it does and how it runs.
+
+* January 5, 2006
+
+- James Bursa fixed c-ares to find the hosts file on RISC OS, and made it
+  build with newer gcc versions that no longer defines "riscos".
+
+* December 22
+
+- Daniel Stenberg added ares_getsock() that extracts the set of sockets to
+  wait for action on. Similar to ares_fds() but not restricted to using
+  select() for the waiting.
+
+* November 25
+
+- Yang Tse fixed some send() / recv() compiler warnings
+
+* September 18
+
+- Added constants that will be used by ares_getaddrinfo
+
+- Made ares_getnameinfo use the reentrant getservbyport (getservbyport_r) if it
+  is available to ensure it works properly in a threaded environment.
+
+* September 10
+
+- configure fix for detecting a member in the sockaddr_in6 struct which failed
+  on ipv6-enabled HP-UX 11.00
+
+Version 1.3.0 (August 29, 2005)
 
 * August 21
 

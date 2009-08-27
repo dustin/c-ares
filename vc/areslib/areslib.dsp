@@ -63,8 +63,8 @@ LIB32=link.exe -lib
 # PROP Output_Dir "Debug"
 # PROP Intermediate_Dir "Debug"
 # PROP Target_Dir ""
-# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ  /c
-# ADD CPP /nologo /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ  /c
+# ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
+# ADD CPP /nologo /W3 /Gm /GX /ZI /Od /I "..\.." /D "WIN32" /D "_DEBUG" /D "_MBCS" /D "_LIB" /YX /FD /GZ /c
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
 # ADD RSC /l 0x409 /d "_DEBUG"
 BSC32=bscmake.exe
@@ -94,6 +94,10 @@ SOURCE=..\..\ares__get_hostent.c
 # Begin Source File
 
 SOURCE=..\..\ares__read_line.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_cancel.c
 # End Source File
 # Begin Source File
 
@@ -137,6 +141,10 @@ SOURCE=..\..\ares_parse_a_reply.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\ares_parse_aaaa_reply.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\ares_parse_ptr_reply.c
 # End Source File
 # Begin Source File
@@ -153,14 +161,6 @@ SOURCE=..\..\ares_search.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\ares_cancel.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\ares_version.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\ares_send.c
 # End Source File
 # Begin Source File
@@ -170,6 +170,22 @@ SOURCE=..\..\ares_strerror.c
 # Begin Source File
 
 SOURCE=..\..\ares_timeout.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_version.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\bitncmp.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\inet_net_pton.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\inet_ntop.c
 # End Source File
 # Begin Source File
 
@@ -189,11 +205,27 @@ SOURCE=..\..\ares_dns.h
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\ares_version.h
+SOURCE=..\..\ares_ipv6.h
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\ares_private.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\ares_version.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\bitncmp.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\inet_net_pton.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\inet_ntop.h
 # End Source File
 # Begin Source File
 

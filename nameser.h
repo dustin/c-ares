@@ -1,3 +1,5 @@
+/* $Id: nameser.h,v 1.16 2005/12/19 00:15:04 yangtse Exp $ */
+
 #ifndef ARES_NAMESER_H
 #define ARES_NAMESER_H
 
@@ -16,7 +18,7 @@
 
 #define EINPROGRESS WSAEINPROGRESS
 #define EWOULDBLOCK WSAEWOULDBLOCK
-#define EMSGSIZE WSAEMSGSIZE
+#define EMSGSIZE     WSAEMSGSIZE
 #define EAFNOSUPPORT WSAEAFNOSUPPORT
 
 /* Structure for scatter/gather I/O.  */
