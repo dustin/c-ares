@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: adig.c,v 1.2 1998/08/17 21:45:48 ghudson Exp $";
+static const char rcsid[] = "$Id: adig.c,v 1.4 1998/09/17 23:19:12 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 	  /* Set the TCP port number. */
 	  if (!isdigit(*optarg))
 	    usage();
-	  options.tcp_port = strtoul(optarg, NULL, 0);
+	  options.tcp_port = strtol(optarg, NULL, 0);
 	  optmask |= ARES_OPT_TCP_PORT;
 	  break;
 
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
 	  /* Set the UDP port number. */
 	  if (!isdigit(*optarg))
 	    usage();
-	  options.udp_port = strtoul(optarg, NULL, 0);
+	  options.udp_port = strtol(optarg, NULL, 0);
 	  optmask |= ARES_OPT_UDP_PORT;
 	  break;
 	}
@@ -271,7 +271,7 @@ static void callback(void *arg, int status, unsigned char *abuf, int alen)
   char *name = (char *) arg, *errmem;
   int id, qr, opcode, aa, tc, rd, ra, rcode, i;
   unsigned int qdcount, ancount, nscount, arcount;
-  const char *aptr;
+  const unsigned char *aptr;
 
   /* Display the query name if given. */
   if (name)

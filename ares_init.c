@@ -13,10 +13,11 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_init.c,v 1.3 1998/08/17 21:49:11 ghudson Exp $";
+static const char rcsid[] = "$Id: ares_init.c,v 1.6 1998/09/22 01:46:11 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -31,19 +32,23 @@ static const char rcsid[] = "$Id: ares_init.c,v 1.3 1998/08/17 21:49:11 ghudson 
 #include "ares.h"
 #include "ares_private.h"
 
-struct server_ent {
-  struct in_addr addr;
-  struct server_ent *next;
-};
-
 static int init_by_options(ares_channel channel, struct ares_options *options,
 			   int optmask);
 static int init_by_environment(ares_channel channel);
 static int init_by_resolv_conf(ares_channel channel);
 static int init_by_defaults(ares_channel channel);
+static int config_domain(ares_channel channel, char *str);
+static int config_lookup(ares_channel channel, const char *str);
+static int config_nameserver(struct server_state **servers, int *nservers,
+			     const char *str);
+static int config_sortlist(struct apattern **sortlist, int *nsort,
+			   const char *str);
 static int set_search(ares_channel channel, const char *str);
 static int set_options(ares_channel channel, const char *str);
+static char *try_config(char *s, char *opt);
 static const char *try_option(const char *p, const char *q, const char *opt);
+static int ip_addr(const char *s, int len, struct in_addr *addr);
+static void natural_mask(struct apattern *pat);
 
 int ares_init(ares_channel *channelptr)
 {
@@ -73,6 +78,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   channel->tcp_port = -1;
   channel->nservers = -1;
   channel->ndomains = -1;
+  channel->nsort = -1;
   channel->lookups = NULL;
 
   /* Initialize configuration by each of the four sources, from highest
@@ -96,8 +102,9 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
 	    free(channel->domains[i]);
 	  free(channel->domains);
 	}
-      if (channel->lookups)
-	free(channel->lookups);
+      if (channel->nsort != -1)
+	free(channel->sortlist);
+      free(channel->lookups);
       free(channel);
       return status;
     }
@@ -219,125 +226,59 @@ static int init_by_environment(ares_channel channel)
 static int init_by_resolv_conf(ares_channel channel)
 {
   FILE *fp;
-  char *line = NULL, *p, *q, lookups[3], *l;
-  int linesize, status, n = 0;
-  struct server_ent *servhead = NULL, *ent;
-  struct in_addr addr;
+  char *line = NULL, *p;
+  int linesize, status, nservers = 0, nsort = 0;
+  struct server_state *servers = NULL;
+  struct apattern *sortlist = NULL;
 
   fp = fopen(PATH_RESOLV_CONF, "r");
   if (!fp)
     return (errno == ENOENT) ? ARES_SUCCESS : ARES_EFILE;
   while ((status = ares__read_line(fp, &line, &linesize)) == ARES_SUCCESS)
     {
-      if (strncmp(line, "domain", 6) == 0 && isspace(line[6])
-	  && channel->ndomains == -1)
-	{
-	  /* Set the domain search list to a single domain. */
-	  p = line + 6;
-	  while (isspace(*p))
-	    p++;
-	  q = p;
-	  while (*q && !isspace(*q))
-	    q++;
-	  *q = 0;
-	  status = set_search(channel, p);
-	  if (status != ARES_SUCCESS)
-	    break;
-	}
-      else if (strncmp(line, "lookup", 6) == 0 && isspace(line[6])
-	       && !channel->lookups)
-	{
-	  /* Set the lookup order.  Only the first letter of each work
-	   * is relevant, and it has to be "b" for DNS or "f" for the
-	   * host file.  Ignore everything else.
-	   */
-	  l = lookups;
-	  p = line + 6;
-	  while (isspace(*p))
-	    p++;
-	  while (*p)
-	    {
-	      if ((*p == 'b' || *p == 'f') && l < lookups + 2)
-		*l++ = *p;
-	      while (*p && !isspace(*p))
-		p++;
-	      while (isspace(*p))
-		p++;
-	    }
-	  *l = 0;
-	  channel->lookups = strdup(lookups);
-	  if (!channel->lookups)
-	    {
-	      status = ARES_ENOMEM;
-	      break;
-	    }
-	}
-      else if (strncmp(line, "search", 6) == 0 && isspace(line[6])
-	       && channel->ndomains == -1)
-	{
-	  /* Set the domain search list to one or more domains. */
-	  status = set_search(channel, line + 6);
-	  if (status != ARES_SUCCESS)
-	    break;
-	}
-      else if (strncmp(line, "nameserver", 10) == 0 && isspace(line[10])
-	       && channel->nservers == -1)
-	{
-	  /* Add a name server entry to our linked queue. */
-	  p = line + 10;
-	  while (isspace(*p))
-	    p++;
-	  addr.s_addr = inet_addr(p);
-	  if (addr.s_addr == INADDR_NONE)
-	    continue;
-	  ent = malloc(sizeof(struct server_ent));
-	  if (!ent)
-	    {
-	      status = ARES_ENOMEM;
-	      break;
-	    }
-	  ent->addr = addr;
-	  ent->next = servhead;
-	  servhead = ent;
-	  n++;
-	}
-      else if (strncmp(line, "options", 7) == 0 && isspace(line[7]))
-	{
-	  /* Set resolver options. */
-	  status = set_options(channel, line + 7);
-	  if (status != ARES_SUCCESS)
-	    break;
-	}
+      if ((p = try_config(line, "domain")) && channel->ndomains == -1)
+	status = config_domain(channel, p);
+      else if ((p = try_config(line, "lookup")) && !channel->lookups)
+	status = config_lookup(channel, p);
+      else if ((p = try_config(line, "search")) && channel->ndomains == -1)
+	status = set_search(channel, p);
+      else if ((p = try_config(line, "nameserver")) && channel->nservers == -1)
+	status = config_nameserver(&servers, &nservers, p);
+      else if ((p = try_config(line, "sortlist")) && channel->nsort == -1)
+	status = config_sortlist(&sortlist, &nsort, p);
+      else if ((p = try_config(line, "options")))
+	status = set_options(channel, p);
+      else
+	status = ARES_SUCCESS;
+      if (status != ARES_SUCCESS)
+	break;
     }
   free(line);
   fclose(fp);
 
-  /* If all went well and we got any servers (which only happens when
-   * channel->nservers was -1 coming into this function), turn the
-   * linked list of servers into an array.
-   */
-  if (status == ARES_EOF && servhead)
+  /* Handle errors. */
+  if (status != ARES_EOF)
     {
-      channel->servers = malloc(n * sizeof(struct server_state));
-      if (channel->servers)
-	{
-	  channel->nservers = n;
-	  for (ent = servhead; ent; ent = ent->next)
-	    channel->servers[--n].addr = ent->addr;
-	}
-      else
-	status = ARES_ENOMEM;
+      free(servers);
+      free(sortlist);
+      return status;
     }
 
-  /* Free the linked queue. */
-  while (servhead)
+  /* If we got any name server entries, fill them in. */
+  if (servers)
     {
-      ent = servhead;
-      servhead = servhead->next;
-      free(ent);
+      channel->servers = servers;
+      channel->nservers = nservers;
     }
 
-  return (status == ARES_EOF) ? ARES_SUCCESS : status;
+  /* If we got any sortlist entries, fill them in. */
+  if (sortlist)
+    {
+      channel->sortlist = sortlist;
+      channel->nsort = nsort;
+    }
+
+  return ARES_SUCCESS;
 }
 
 static int init_by_defaults(ares_channel channel)
@@ -391,6 +332,12 @@ static int init_by_defaults(ares_channel channel)
 	}
     }
 
+  if (channel->nsort == -1)
+    {
+      channel->sortlist = NULL;
+      channel->nsort = 0;
+    }
+
   if (!channel->lookups)
     {
       channel->lookups = strdup("bf");
@@ -401,14 +348,113 @@ static int init_by_defaults(ares_channel channel)
   return ARES_SUCCESS;
 }
 
+static int config_domain(ares_channel channel, char *str)
+{
+  char *q;
+
+  /* Set a single search domain. */
+  q = str;
+  while (*q && !isspace(*q))
+    q++;
+  *q = 0;
+  return set_search(channel, str);
+}
+
+static int config_lookup(ares_channel channel, const char *str)
+{
+  char lookups[3], *l;
+  const char *p;
+
+  /* Set the lookup order.  Only the first letter of each work
+   * is relevant, and it has to be "b" for DNS or "f" for the
+   * host file.  Ignore everything else.
+   */
+  l = lookups;
+  p = str;
+  while (*p)
+    {
+      if ((*p == 'b' || *p == 'f') && l < lookups + 2)
+	*l++ = *p;
+      while (*p && !isspace(*p))
+	p++;
+      while (isspace(*p))
+	p++;
+    }
+  *l = 0;
+  channel->lookups = strdup(lookups);
+  return (channel->lookups) ? ARES_SUCCESS : ARES_ENOMEM;
+}
+
+static int config_nameserver(struct server_state **servers, int *nservers,
+			     const char *str)
+{
+  struct in_addr addr;
+  struct server_state *newserv;
+
+  /* Add a nameserver entry, if this is a valid address. */
+  addr.s_addr = inet_addr(str);
+  if (addr.s_addr == INADDR_NONE)
+    return ARES_SUCCESS;
+  newserv = realloc(*servers, (*nservers + 1) * sizeof(struct server_state));
+  if (!newserv)
+    return ARES_ENOMEM;
+  newserv[*nservers].addr = addr;
+  *servers = newserv;
+  (*nservers)++;
+  return ARES_SUCCESS;
+}
+
+static int config_sortlist(struct apattern **sortlist, int *nsort,
+			   const char *str)
+{
+  struct apattern pat, *newsort;
+  const char *q;
+
+  /* Add sortlist entries. */
+  while (*str && *str != ';')
+    {
+      q = str;
+      while (*q && *q != '/' && *q != ';' && !isspace(*q))
+	q++;
+      if (ip_addr(str, q - str, &pat.addr) == 0)
+	{
+	  /* We have a pattern address; now determine the mask. */
+	  if (*q == '/')
+	    {
+	      str = q + 1;
+	      while (*q && *q != ';' && !isspace(*q))
+		q++;
+	      if (ip_addr(str, q - str, &pat.mask) != 0)
+		natural_mask(&pat);
+	    }
+	  else
+	    natural_mask(&pat);
+
+	  /* Add this pattern to our list. */
+	  newsort = realloc(*sortlist, (*nsort + 1) * sizeof(struct apattern));
+	  if (!newsort)
+	    return ARES_ENOMEM;
+	  newsort[*nsort] = pat;
+	  *sortlist = newsort;
+	  (*nsort)++;
+	}
+      else
+	{
+	  while (*q && *q != ';' && !isspace(*q))
+	    q++;
+	}
+      str = q;
+      while (isspace(*str))
+	str++;
+    }
+
+  return ARES_SUCCESS;
+}
+
 static int set_search(ares_channel channel, const char *str)
 {
   int n;
   const char *p, *q;
-
-  /* Skip leading whitespace, for simplicity. */
-  while (isspace(*str))
-    str++;
 
   /* Count the domains given. */
   n = 0;
@@ -454,10 +500,6 @@ static int set_options(ares_channel channel, const char *str)
 {
   const char *p, *q, *val;
 
-  /* Skip leading whitespace, for simplicity. */
-  while (isspace(*str))
-    str++;
-
   p = str;
   while (*p)
     {
@@ -481,10 +523,59 @@ static int set_options(ares_channel channel, const char *str)
   return ARES_SUCCESS;
 }
 
+static char *try_config(char *s, char *opt)
+{
+  int len;
+
+  len = strlen(opt);
+  if (strncmp(s, opt, len) != 0 || !isspace(s[len]))
+    return NULL;
+  s += len;
+  while (isspace(*s))
+    s++;
+  return s;
+}
+
 static const char *try_option(const char *p, const char *q, const char *opt)
 {
   int len;
 
   len = strlen(opt);
   return (q - p > len && strncmp(p, opt, len) == 0) ? p + len : NULL;
+}
+
+static int ip_addr(const char *s, int len, struct in_addr *addr)
+{
+  char ipbuf[16];
+
+  /* Four octets and three periods yields at most 15 characters. */
+  if (len > 15)
+    return -1;
+  memcpy(ipbuf, s, len);
+  ipbuf[len] = 0;
+
+  addr->s_addr = inet_addr(ipbuf);
+  if (addr->s_addr == INADDR_NONE && strcmp(ipbuf, "255.255.255.255") != 0)
+    return -1;
+  return 0;
+}
+
+static void natural_mask(struct apattern *pat)
+{
+  struct in_addr addr;
+
+  /* Store a host-byte-order copy of pat in a struct in_addr.  Icky,
+   * but portable.
+   */
+  addr.s_addr = ntohl(pat->addr.s_addr);
+
+  /* This is out of date in the CIDR world, but some people might
+   * still rely on it.
+   */
+  if (IN_CLASSA(addr.s_addr))
+    pat->mask.s_addr = htonl(IN_CLASSA_NET);
+  else if (IN_CLASSB(addr.s_addr))
+    pat->mask.s_addr = htonl(IN_CLASSB_NET);
+  else
+    pat->mask.s_addr = htonl(IN_CLASSC_NET);
 }

@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_gethostbyname.c,v 1.1 1998/08/13 18:06:30 ghudson Exp $";
+static const char rcsid[] = "$Id: ares_gethostbyname.c,v 1.6 1998/09/22 01:46:11 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -43,15 +43,17 @@ static void host_callback(void *arg, int status, unsigned char *abuf,
 			  int alen);
 static void end_hquery(struct host_query *hquery, int status,
 		       struct hostent *host);
-static int fake_hostent(const char *name, struct hostent **host);
+static int fake_hostent(const char *name, ares_host_callback callback,
+			void *arg);
 static int file_lookup(const char *name, struct hostent **host);
+static void sort_addresses(struct hostent *host, struct apattern *sortlist,
+			   int nsort);
+static int get_address_index(struct in_addr *addr, struct apattern *sortlist,
+			     int nsort);
 
 void ares_gethostbyname(ares_channel channel, const char *name, int family,
 			ares_host_callback callback, void *arg)
 {
-  const char *p;
-  int status;
-  struct hostent *host;
   struct host_query *hquery;
 
   /* Right now we only know how to look up Internet addresses. */
@@ -61,22 +63,8 @@ void ares_gethostbyname(ares_channel channel, const char *name, int family,
       return;
     }
 
-  /* If the name looks like an IP address, fake up a host entry and
-   * end the query immediately.
-   */
-  for (p = name; *p; p++)
-    {
-      if (!isdigit(*p) && *p != '.')
-	break;
-    }
-  if (!*p)
-    {
-      status = fake_hostent(name, &host);
-      callback(arg, status, host);
-      if (host)
-	ares_free_hostent(host);
-      return;
-    }
+  if (fake_hostent(name, callback, arg))
+    return;
 
   /* Allocate and fill in the host query structure. */
   hquery = malloc(sizeof(struct host_query));
@@ -135,11 +123,14 @@ static void next_lookup(struct host_query *hquery)
 static void host_callback(void *arg, int status, unsigned char *abuf, int alen)
 {
   struct host_query *hquery = (struct host_query *) arg;
+  ares_channel channel = hquery->channel;
   struct hostent *host;
 
   if (status == ARES_SUCCESS)
     {
       status = ares_parse_a_reply(abuf, alen, &host);
+      if (host && channel->nsort)
+	sort_addresses(host, channel->sortlist, channel->nsort);
       end_hquery(hquery, status, host);
     }
   else if (status == ARES_EDESTRUCTION)
@@ -158,52 +149,58 @@ static void end_hquery(struct host_query *hquery, int status,
   free(hquery);
 }
 
-static int fake_hostent(const char *name, struct hostent **host)
+/* If the name looks like an IP address, fake up a host entry, end the
+ * query immediately, and return true.  Otherwise return false.
+ */
+static int fake_hostent(const char *name, ares_host_callback callback,
+			void *arg)
 {
   struct in_addr addr;
-  struct hostent *hostent;
+  struct hostent hostent;
+  const char *p;
+  char *aliases[1] = { NULL };
+  char *addrs[2];
 
-  *host = NULL;
+  /* It only looks like an IP address if it's all numbers and dots. */
+  for (p = name; *p; p++)
+    {
+      if (!isdigit(*p) && *p != '.')
+	return 0;
+    }
 
+  /* It also only looks like an IP address if it's non-zero-length and
+   * doesn't end with a dot.
+   */
+  if (p == name || *(p - 1) == '.')
+    return 0;
+
+  /* It looks like an IP address.  Figure out what IP address it is. */
   addr.s_addr = inet_addr(name);
   if (addr.s_addr == INADDR_NONE)
-    return ARES_EBADNAME;
-
-  /* Allocate five bits of memory for the host structure.  Yuck. */
-  hostent = malloc(sizeof(struct hostent));
-  if (hostent)
     {
-      hostent->h_name = strdup(name);
-      if (hostent->h_name)
-	{
-	  hostent->h_aliases = malloc(sizeof(char *));
-	  if (hostent->h_aliases)
-	    {
-	      hostent->h_addr_list = malloc(2 * sizeof(char *));
-	      if (hostent->h_addr_list)
-		{
-		  hostent->h_addr_list[0] = malloc(sizeof(struct in_addr));
-		  if (hostent->h_addr_list[0])
-		    {
-		      /* All allocations succeeded; go ahead. */
-		      hostent->h_aliases[0] = NULL;
-		      hostent->h_addrtype = AF_INET;
-		      hostent->h_length = sizeof(struct in_addr);
-		      memcpy(hostent->h_addr_list[0], &addr,
-			     sizeof(struct in_addr));
-		      hostent->h_addr_list[1] = NULL;
-		      *host = hostent;
-		      return ARES_SUCCESS;
-		    }
-		  free(hostent->h_addr_list);
-		}
-	      free(hostent->h_aliases);
-	    }
-	  free(hostent->h_name);
-	}
-      free(hostent);
+      callback(arg, ARES_EBADNAME, NULL);
+      return 1;
     }
-  return ARES_ENOMEM;
+
+  /* Duplicate the name, to avoid a constness violation. */
+  hostent.h_name = strdup(name);
+  if (!hostent.h_name)
+    {
+      callback(arg, ARES_ENOMEM, NULL);
+      return 1;
+    }
+
+  /* Fill in the rest of the host structure and terminate the query. */
+  addrs[0] = (char *) &addr;
+  addrs[1] = NULL;
+  hostent.h_aliases = aliases;
+  hostent.h_addrtype = AF_INET;
+  hostent.h_length = sizeof(struct in_addr);
+  hostent.h_addr_list = addrs;
+  callback(arg, ARES_SUCCESS, &hostent);
+
+  free(hostent.h_name);
+  return 1;
 }
 
 static int file_lookup(const char *name, struct hostent **host)
@@ -235,4 +232,47 @@ static int file_lookup(const char *name, struct hostent **host)
   if (status != ARES_SUCCESS)
     *host = NULL;
   return status;
+}
+
+static void sort_addresses(struct hostent *host, struct apattern *sortlist,
+			   int nsort)
+{
+  struct in_addr a1, a2;
+  int i1, i2, ind1, ind2;
+
+  /* This is a simple insertion sort, not optimized at all.  i1 walks
+   * through the address list, with the loop invariant that everything
+   * to the left of i1 is sorted.  In the loop body, the value at i1 is moved
+   * back through the list (via i2) until it is in sorted order.
+   */
+  for (i1 = 0; host->h_addr_list[i1]; i1++)
+    {
+      memcpy(&a1, host->h_addr_list[i1], sizeof(struct in_addr));
+      ind1 = get_address_index(&a1, sortlist, nsort);
+      for (i2 = i1 - 1; i2 >= 0; i2--)
+	{
+	  memcpy(&a2, host->h_addr_list[i2], sizeof(struct in_addr));
+	  ind2 = get_address_index(&a2, sortlist, nsort);
+	  if (ind2 <= ind1)
+	    break;
+	  memcpy(host->h_addr_list[i2 + 1], &a2, sizeof(struct in_addr));
+	}
+      memcpy(host->h_addr_list[i2 + 1], &a1, sizeof(struct in_addr));
+    }
+}
+
+/* Find the first entry in sortlist which matches addr.  Return nsort
+ * if none of them match.
+ */
+static int get_address_index(struct in_addr *addr, struct apattern *sortlist,
+			     int nsort)
+{
+  int i;
+
+  for (i = 0; i < nsort; i++)
+    {
+      if ((addr->s_addr & sortlist[i].mask.s_addr) == sortlist[i].addr.s_addr)
+	break;
+    }
+  return i;
 }
