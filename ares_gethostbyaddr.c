@@ -1,4 +1,4 @@
-/* $Id: ares_gethostbyaddr.c,v 1.18 2005/11/11 19:23:02 giva Exp $ */
+/* $Id: ares_gethostbyaddr.c,v 1.23 2007-02-26 04:33:19 giva Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -15,7 +15,6 @@
  * without express or implied warranty.
  */
 #include "setup.h"
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -186,6 +185,7 @@ static int file_lookup(union ares_addr *addr, int family, struct hostent **host)
 {
   FILE *fp;
   int status;
+  int error;
 
 #ifdef WIN32
   char PATH_HOSTS[MAX_PATH];
@@ -218,7 +218,22 @@ static int file_lookup(union ares_addr *addr, int family, struct hostent **host)
 
   fp = fopen(PATH_HOSTS, "r");
   if (!fp)
-    return ARES_ENOTFOUND;
+    {
+      error = ERRNO;
+      switch(error)
+        {
+        case ENOENT:
+        case ESRCH:
+          return ARES_ENOTFOUND;
+        default:
+          DEBUGF(fprintf(stderr, "fopen() failed with error: %d %s\n",
+                         error, strerror(error)));
+          DEBUGF(fprintf(stderr, "Error opening file: %s\n",
+                         PATH_HOSTS));
+          *host = NULL;
+          return ARES_EFILE;
+        }
+    }
   while ((status = ares__get_hostent(fp, family, host)) == ARES_SUCCESS)
     {
       if (family != (*host)->h_addrtype)

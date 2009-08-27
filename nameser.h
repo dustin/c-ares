@@ -1,4 +1,4 @@
-/* $Id: nameser.h,v 1.17 2006-07-05 23:10:38 yangtse Exp $ */
+/* $Id: nameser.h,v 1.19 2007-02-17 13:51:24 yangtse Exp $ */
 
 #ifndef ARES_NAMESER_H
 #define ARES_NAMESER_H
@@ -18,11 +18,6 @@
 
 #define MAXHOSTNAMELEN 256
 
-#define EINPROGRESS WSAEINPROGRESS
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EMSGSIZE     WSAEMSGSIZE
-#define EAFNOSUPPORT WSAEAFNOSUPPORT
-
 /* Structure for scatter/gather I/O.  */
 struct iovec
 {
@@ -30,7 +25,9 @@ struct iovec
     size_t iov_len;     /* Length of data.  */
 };
 
+#ifndef __WATCOMC__
 #define getpid() _getpid()
+#endif
 
 int ares_writev (SOCKET s, const struct iovec *vector, size_t count);
 #define writev(s,vect,count)  ares_writev(s,vect,count)

@@ -1,4 +1,4 @@
-/* $Id: ares_getnameinfo.c,v 1.16 2006-10-25 14:16:01 giva Exp $ */
+/* $Id: ares_getnameinfo.c,v 1.23 2007-02-26 04:33:19 giva Exp $ */
 
 /* Copyright 2005 by Dominick Meglio
  *
@@ -15,8 +15,6 @@
  * without express or implied warranty.
  */
 #include "setup.h"
-#include <sys/types.h>
-#include <ctype.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -110,7 +108,8 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
         port = addr->sin_port;
       else
         port = addr6->sin6_port;
-      service = lookup_service(port, flags, buf, sizeof(buf));
+      service = lookup_service((unsigned short)(port & 0xffff),
+                               flags, buf, sizeof(buf));
       callback(arg, ARES_SUCCESS, NULL, service);
       return;
     }
@@ -151,7 +150,8 @@ void ares_getnameinfo(ares_channel channel, const struct sockaddr *sa, socklen_t
           }
         /* They also want a service */
         if (flags & ARES_NI_LOOKUPSERVICE)
-          service = lookup_service(port, flags, srvbuf, sizeof(srvbuf));
+          service = lookup_service((unsigned short)(port & 0xffff),
+                                   flags, srvbuf, sizeof(srvbuf));
         callback(arg, ARES_SUCCESS, ipbuf, service);
         return;
       }
@@ -220,7 +220,8 @@ static void nameinfo_callback(void *arg, int status, struct hostent *host)
                  *end = 0;
              }
         }
-      niquery->callback(niquery->arg, ARES_SUCCESS, host->h_name, service);
+      niquery->callback(niquery->arg, ARES_SUCCESS, (char *)(host->h_name),
+                        service);
       return;
     }
   /* We couldn't find the host, but it's OK, we can use the IP */
@@ -302,7 +303,7 @@ static char *lookup_service(unsigned short port, int flags,
         strcpy(tmpbuf, sep->s_name);
       else
         /* get port as a string */
-        sprintf(tmpbuf, "%u", ntohs(port));
+        sprintf(tmpbuf, "%u", (unsigned int)ntohs(port));
       if (strlen(tmpbuf) < buflen)
         /* return it if buffer big enough */
         strcpy(buf, tmpbuf);
@@ -319,6 +320,9 @@ static char *lookup_service(unsigned short port, int flags,
 static void append_scopeid(struct sockaddr_in6 *addr6, unsigned int flags,
                            char *buf, size_t buflen)
 {
+#ifdef HAVE_IF_INDEXTONAME
+  int is_ll, is_mcll;
+#endif
   char fmt_u[] = "%u";
   char fmt_lu[] = "%lu";
   char tmpbuf[IF_NAMESIZE + 2];
@@ -328,9 +332,10 @@ static void append_scopeid(struct sockaddr_in6 *addr6, unsigned int flags,
   tmpbuf[0] = '%';
 
 #ifdef HAVE_IF_INDEXTONAME
+  is_ll = IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr);
+  is_mcll = IN6_IS_ADDR_MC_LINKLOCAL(&addr6->sin6_addr);
   if ((flags & ARES_NI_NUMERICSCOPE) ||
-      (!IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)
-       && !IN6_IS_ADDR_MC_LINKLOCAL(&addr6->sin6_addr)))
+      (!is_ll && !is_mcll))
     {
        sprintf(&tmpbuf[1], fmt, addr6->sin6_scope_id);
     }
@@ -356,6 +361,7 @@ static void append_scopeid(struct sockaddr_in6 *addr6, unsigned int flags,
 static char *ares_striendstr(const char *s1, const char *s2)
 {
   const char *c1, *c2, *c1_begin;
+  int lo1, lo2;
   size_t s1_len = strlen(s1), s2_len = strlen(s2);
 
   /* If the substr is longer than the full str, it can't match */
@@ -368,7 +374,9 @@ static char *ares_striendstr(const char *s1, const char *s2)
   c2 = s2;
   while (c2 < s2+s2_len)
     {
-      if (tolower(*c1) != tolower(*c2))
+      lo1 = tolower(*c1);
+      lo2 = tolower(*c2);
+      if (lo1 != lo2)
         return NULL;
       else
         {

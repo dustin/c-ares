@@ -1,6 +1,6 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
- * $Id: ahost.c,v 1.11 2006-10-31 17:51:54 giva Exp $
+ * $Id: ahost.c,v 1.19 2007-04-16 15:35:34 yangtse Exp $
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -16,33 +16,29 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if !defined(WIN32) || defined(WATT32)
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #include "ares.h"
 #include "ares_dns.h"
 #include "inet_ntop.h"
 #include "inet_net_pton.h"
-
-#ifndef INADDR_NONE
-#define INADDR_NONE 0xffffffff
-#endif
+#include "ares_getopt.h"
 
 #ifndef HAVE_STRUCT_IN6_ADDR
 struct in6_addr
@@ -69,10 +65,15 @@ int main(int argc, char **argv)
   WSAStartup(wVersionRequested, &wsaData);
 #endif
 
-  while ((c = getopt(argc,argv,"t:h")) != -1)
+  while ((c = ares_getopt(argc,argv,"dt:h")) != -1)
     {
       switch (c)
         {
+        case 'd':
+#ifdef WATT32
+          dbug_init();
+#endif
+          break;
         case 't':
           if (!strcasecmp(optarg,"a"))
             addr_family = AF_INET;
@@ -133,6 +134,11 @@ int main(int argc, char **argv)
     }
 
   ares_destroy(channel);
+
+#ifdef USE_WINSOCK
+  WSACleanup();
+#endif
+
   return 0;
 }
 

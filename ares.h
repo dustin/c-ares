@@ -1,4 +1,4 @@
-/* $Id: ares.h,v 1.25 2006-10-11 16:01:16 yangtse Exp $ */
+/* $Id: ares.h,v 1.30 2007-05-30 20:49:14 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -94,6 +94,7 @@ extern "C" {
 #define ARES_OPT_DOMAINS        (1 << 7)
 #define ARES_OPT_LOOKUPS        (1 << 8)
 #define ARES_OPT_SOCK_STATE_CB  (1 << 9)
+#define ARES_OPT_SORTLIST       (1 << 10)
 
 /* Nameinfo flag values */
 #define ARES_NI_NOFQDN                  (1 << 0)
@@ -136,6 +137,22 @@ extern "C" {
 #define ARES_GETSOCK_WRITABLE(bits,num) (bits & (1 << ((num) + \
                                          ARES_GETSOCK_MAXNUM)))
 
+
+/*
+ * Typedef our socket type
+ */
+
+#ifndef ares_socket_typedef
+#ifdef WIN32
+typedef SOCKET ares_socket_t;
+#define ARES_SOCKET_BAD INVALID_SOCKET
+#else
+typedef int ares_socket_t;
+#define ARES_SOCKET_BAD -1
+#endif
+#define ares_socket_typedef
+#endif /* ares_socket_typedef */
+
 #ifdef WIN32
 typedef void (*ares_sock_state_cb)(void *data,
                                    SOCKET socket,
@@ -147,6 +164,8 @@ typedef void (*ares_sock_state_cb)(void *data,
                                    int readable,
                                    int writable);
 #endif
+
+struct apattern;
 
 struct ares_options {
   int flags;
@@ -162,6 +181,8 @@ struct ares_options {
   char *lookups;
   ares_sock_state_cb sock_state_cb;
   void *sock_state_cb_data;
+  struct apattern *sortlist;
+  int nsort;
 };
 
 struct hostent;
@@ -179,6 +200,8 @@ typedef void (*ares_nameinfo_callback)(void *arg, int status,
 int ares_init(ares_channel *channelptr);
 int ares_init_options(ares_channel *channelptr, struct ares_options *options,
                       int optmask);
+int ares_save_options(ares_channel channel, struct ares_options *options, int *optmask);
+void ares_destroy_options(struct ares_options *options);
 void ares_destroy(ares_channel channel);
 void ares_cancel(ares_channel channel);
 void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
@@ -200,6 +223,8 @@ int ares_getsock(ares_channel channel, int *socks, int numsocks);
 struct timeval *ares_timeout(ares_channel channel, struct timeval *maxtv,
                              struct timeval *tv);
 void ares_process(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
+void ares_process_fd(ares_channel channel, ares_socket_t read_fd,
+                     ares_socket_t write_fd);
 
 int ares_mkquery(const char *name, int dnsclass, int type, unsigned short id,
                  int rd, unsigned char **buf, int *buflen);
@@ -213,6 +238,8 @@ int ares_parse_aaaa_reply(const unsigned char *abuf, int alen,
                        struct hostent **host);
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
                          int addrlen, int family, struct hostent **host);
+int ares_parse_ns_reply(const unsigned char *abuf, int alen,
+                       struct hostent **host);
 void ares_free_string(void *str);
 void ares_free_hostent(struct hostent *host);
 const char *ares_strerror(int code);

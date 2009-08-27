@@ -6,6 +6,9 @@
 /* when building as static part of libcurl */
 #undef BUILDING_LIBCURL
 
+/* Set to explicitly specify we don't want to use thread-safe functions */
+#undef DISABLED_THREADSAFE
+
 /* if a /etc/inet dir is being used */
 #undef ETC_INET
 
@@ -45,11 +48,17 @@
 /* Define to 1 if you have the `bitncmp' function. */
 #undef HAVE_BITNCMP
 
+/* Define to 1 if bool is an available type. */
+#undef HAVE_BOOL_T
+
 /* disabled non-blocking sockets */
 #undef HAVE_DISABLED_NONBLOCKING
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <errno.h> header file. */
+#undef HAVE_ERRNO_H
 
 /* use FIONBIO for non-blocking sockets */
 #undef HAVE_FIONBIO
@@ -138,11 +147,23 @@
 /* Define to 1 if you have the send function. */
 #undef HAVE_SEND
 
+/* Define to 1 if you have the <signal.h> header file. */
+#undef HAVE_SIGNAL_H
+
+/* Define to 1 if sig_atomic_t is an available typedef. */
+#undef HAVE_SIG_ATOMIC_T
+
+/* Define to 1 if sig_atomic_t is already defined as volatile. */
+#undef HAVE_SIG_ATOMIC_T_VOLATILE
+
 /* Define to 1 if your struct sockaddr_in6 has sin6_scope_id. */
 #undef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
 
 /* use SO_NONBLOCK for non-blocking sockets */
 #undef HAVE_SO_NONBLOCK
+
+/* Define to 1 if you have the <stdbool.h> header file. */
+#undef HAVE_STDBOOL_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -210,6 +231,9 @@
 /* Define to 1 if you need the malloc.h header file even with stdlib.h */
 #undef NEED_MALLOC_H
 
+/* cpu-machine-OS */
+#undef OS
+
 /* Name of package */
 #undef PACKAGE
 
@@ -228,6 +252,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* a suitable file/device to read random data from */
+#undef RANDOM_FILE
+
 /* Define to the type of arg 1 for recv. */
 #undef RECV_TYPE_ARG1
 
@@ -242,6 +269,9 @@
 
 /* Define to the function return type for recv. */
 #undef RECV_TYPE_RETV
+
+/* Define as the return type of signal handlers (`int' or `void'). */
+#undef RETSIGTYPE
 
 /* Define to the type qualifier of arg 2 for send. */
 #undef SEND_QUAL_ARG2
@@ -291,11 +321,21 @@
 /* Define to avoid automatic inclusion of winsock.h */
 #undef WIN32_LEAN_AND_MEAN
 
+/* Define to 1 if on AIX 3.
+   System headers sometimes define this.
+   We just want to avoid a redefinition error message.  */
+#ifndef _ALL_SOURCE
+# undef _ALL_SOURCE
+#endif
+
 /* Number of bits in a file offset, on hosts where this is settable. */
 #undef _FILE_OFFSET_BITS
 
 /* Define for large files, on AIX-style hosts. */
 #undef _LARGE_FILES
+
+/* define this if you need it to compile thread-safe code */
+#undef _THREAD_SAFE
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const

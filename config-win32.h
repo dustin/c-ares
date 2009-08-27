@@ -1,7 +1,7 @@
 #ifndef __ARES_CONFIG_WIN32_H
 #define __ARES_CONFIG_WIN32_H
 
-/* $Id: config-win32.h,v 1.12 2006-10-31 20:45:17 giva Exp $ */
+/* $Id: config-win32.h,v 1.15 2007-02-06 19:09:57 giva Exp $ */
 
 /* Copyright (C) 2004 - 2006 by Daniel Stenberg et al
  *
@@ -29,11 +29,17 @@
 #define HAVE_GETOPT_H 1
 #endif
 
+/* Define if you have the <signal.h> header file. */
+#define HAVE_SIGNAL_H 1
+
 /* Define if you have the <sys/time.h> header file */
 /* #define HAVE_SYS_TIME_H 1 */
 
 /* Define if you have the <time.h> header file.  */
 #define HAVE_TIME_H 1
+
+/* Define if you have the <process.h> header file.  */
+#define HAVE_PROCESS_H 1
 
 /* Define if you have the <unistd.h> header file.  */
 #if defined(__MINGW32__) || defined(__WATCOMC__) || defined(__LCC__) || \
@@ -56,6 +62,9 @@
 /* ---------------------------------------------------------------- */
 /*                        OTHER HEADER INFO                         */
 /* ---------------------------------------------------------------- */
+
+/* Define if sig_atomic_t is an available typedef. */
+#define HAVE_SIG_ATOMIC_T 1
 
 /* Define if you have the ANSI C header files.  */
 #define STDC_HEADERS 1
@@ -117,6 +126,29 @@
   #undef HAVE_WINSOCK_H
   #undef HAVE_WINSOCK2_H
   #undef HAVE_WS2TCPIP_H
+#endif
+
+/* ---------------------------------------------------------------- */
+/*                       TYPEDEF REPLACEMENTS                       */
+/* ---------------------------------------------------------------- */
+
+/* Define this if in_addr_t is not an available 'typedefed' type */
+#define in_addr_t unsigned long
+
+/* Define as the return type of signal handlers (int or void).  */
+#define RETSIGTYPE void
+
+/* Define ssize_t if it is not an available 'typedefed' type */
+#if (defined(__WATCOMC__) && (__WATCOMC__ >= 1240)) || defined(__POCC__)
+#elif defined(_WIN64)
+#define ssize_t __int64
+#else
+#define ssize_t int
+#endif
+
+/* Define to 'int' if socklen_t is not an available 'typedefed' type */
+#ifndef HAVE_WS2TCPIP_H
+#define socklen_t int
 #endif
 
 /* ---------------------------------------------------------------- */

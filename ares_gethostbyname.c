@@ -1,4 +1,4 @@
-/* $Id: ares_gethostbyname.c,v 1.20 2006-08-04 15:41:56 giva Exp $ */
+/* $Id: ares_gethostbyname.c,v 1.25 2007-06-04 21:33:02 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -16,7 +16,6 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -239,7 +238,7 @@ static int fake_hostent(const char *name, int family, ares_host_callback callbac
   hostent.h_addr_list = addrs;
   callback(arg, ARES_SUCCESS, &hostent);
 
-  free(hostent.h_name);
+  free((char *)(hostent.h_name));
   return 1;
 }
 
@@ -248,6 +247,7 @@ static int file_lookup(const char *name, int family, struct hostent **host)
   FILE *fp;
   char **alias;
   int status;
+  int error;
 
 #ifdef WIN32
   char PATH_HOSTS[MAX_PATH];
@@ -280,8 +280,22 @@ static int file_lookup(const char *name, int family, struct hostent **host)
 
   fp = fopen(PATH_HOSTS, "r");
   if (!fp)
-    return ARES_ENOTFOUND;
-
+    {
+      error = ERRNO;
+      switch(error)
+        {
+        case ENOENT:
+        case ESRCH:
+          return ARES_ENOTFOUND;
+        default:
+          DEBUGF(fprintf(stderr, "fopen() failed with error: %d %s\n",
+                         error, strerror(error)));
+          DEBUGF(fprintf(stderr, "Error opening file: %s\n",
+                         PATH_HOSTS));
+          *host = NULL;
+          return ARES_EFILE;
+        }
+    }
   while ((status = ares__get_hostent(fp, family, host)) == ARES_SUCCESS)
     {
       if (strcasecmp((*host)->h_name, name) == 0)

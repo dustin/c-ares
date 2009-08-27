@@ -1,9 +1,9 @@
 #ifndef __ARES_SETUP_H
 #define __ARES_SETUP_H
 
-/* $Id: setup.h,v 1.23 2006-10-18 21:05:46 yangtse Exp $ */
+/* $Id: setup.h,v 1.26 2007-06-02 19:48:29 bagder Exp $ */
 
-/* Copyright (C) 2004 - 2005 by Daniel Stenberg et al
+/* Copyright (C) 2004 - 2007 by Daniel Stenberg et al
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -118,22 +118,10 @@
 #undef PACKAGE
 
 /*
- * Typedef our socket type
- */
-
-#ifdef USE_WINSOCK
-typedef SOCKET ares_socket_t;
-#define ARES_SOCKET_BAD INVALID_SOCKET
-#else
-typedef int ares_socket_t;
-#define ARES_SOCKET_BAD -1
-#endif
-
-/*
  * Assume a few thing unless they're set by configure
  */
 
-#if !defined(HAVE_SYS_TIME_H) && !defined(_MSC_VER)
+#if !defined(HAVE_SYS_TIME_H) && !defined(_MSC_VER) && !defined(__WATCOMC__)
 #define HAVE_SYS_TIME_H
 #endif
 
@@ -156,6 +144,11 @@ int ares_strcasecmp(const char *s1, const char *s2);
    same */
 #define strncasecmp(a,b,c) ares_strncasecmp(a,b,c)
 #define strcasecmp(a,b) ares_strcasecmp(a,b)
+#ifdef _MSC_VER
+#  if _MSC_VER >= 1400
+#    define strdup(a) _strdup(a)
+#  endif
+#endif
 #endif
 
 /* IPv6 compatibility */

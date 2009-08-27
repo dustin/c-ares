@@ -1,6 +1,6 @@
 #include "setup.h"
 
-/* $Id: windows_port.c,v 1.12 2006-07-28 18:01:23 yangtse Exp $ */
+/* $Id: windows_port.c,v 1.17 2007-02-19 17:40:36 giva Exp $ */
 
 /* only do the following on windows
  */
@@ -20,6 +20,20 @@
 #include "ares.h"
 #include "ares_private.h"
 
+#ifdef __WATCOMC__
+/*
+ * Watcom needs a DllMain() in order to initialise the clib startup code.
+ */
+BOOL
+WINAPI DllMain (HINSTANCE hnd, DWORD reason, LPVOID reserved)
+{
+  (void) hnd;
+  (void) reason;
+  (void) reserved;
+  return (TRUE);
+}
+#endif
+
 #ifndef __MINGW32__
 int
 ares_strncasecmp(const char *a, const char *b, int n)
@@ -27,8 +41,8 @@ ares_strncasecmp(const char *a, const char *b, int n)
     int i;
 
     for (i = 0; i < n; i++) {
-        int c1 = isupper(a[i]) ? tolower(a[i]) : a[i];
-        int c2 = isupper(b[i]) ? tolower(b[i]) : b[i];
+        int c1 = ISUPPER(a[i]) ? tolower(a[i]) : a[i];
+        int c2 = ISUPPER(b[i]) ? tolower(b[i]) : b[i];
         if (c1 != c2) return c1-c2;
     }
     return 0;
@@ -91,7 +105,7 @@ ares_writev (ares_socket_t s, const struct iovec *vector, size_t count)
   buffer = bp = (char*) alloca (bytes);
   if (!buffer)
   {
-    errno = ENOMEM;
+    SET_ERRNO(ENOMEM);
     return (-1);
   }
 

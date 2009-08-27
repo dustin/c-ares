@@ -7,6 +7,15 @@ AM_CONFIG_HEADER(config.h)
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE(c-ares, CVS)
 
+dnl
+dnl Detect the canonical host and target build environment
+dnl
+
+AC_CANONICAL_HOST
+dnl Get system canonical name
+AC_DEFINE_UNQUOTED(OS, "${host}", [cpu-machine-OS])
+
+AC_AIX
 AC_PROG_CC
 AC_PROG_INSTALL
 
@@ -16,6 +25,7 @@ solaris*)
 	;;
 esac
 
+dnl support building of Windows DLLs
 AC_LIBTOOL_WIN32_DLL
 
 dnl ************************************************************
@@ -61,8 +71,31 @@ AC_HELP_STRING([--disable-debug],[Disable debug options]),
        AC_MSG_RESULT(no)
 )
 
+dnl skip libtool C++ and Fortran compiler checks
+m4_ifdef([AC_PROG_CXX], [m4_undefine([AC_PROG_CXX])])
+m4_defun([AC_PROG_CXX],[])
+m4_ifdef([AC_PROG_F77], [m4_undefine([AC_PROG_F77])])
+m4_defun([AC_PROG_F77],[])
+
+dnl skip libtool C++ and Fortran linker checks
+m4_ifdef([AC_LIBTOOL_CXX], [m4_undefine([AC_LIBTOOL_CXX])])
+m4_defun([AC_LIBTOOL_CXX],[])
+m4_ifdef([AC_LIBTOOL_F77], [m4_undefine([AC_LIBTOOL_F77])])
+m4_defun([AC_LIBTOOL_F77],[])
+
+dnl force libtool to build static libraries with PIC on AMD64-linux
+AC_MSG_CHECKING([if arch-OS host is AMD64-linux (to build static libraries with PIC)])
+case $host in
+  x86_64*linux*)
+    AC_MSG_RESULT([yes])
+    with_pic=yes
+    ;;
+  *)
+    AC_MSG_RESULT([no])
+    ;;
+esac
+
 dnl libtool setup
-CARES_CLEAR_LIBTOOL_TAGS
 AC_PROG_LIBTOOL
 
 AC_MSG_CHECKING([if we need -no-undefined])
@@ -76,6 +109,13 @@ case $host in
 esac
 AC_MSG_RESULT($need_no_undefined)
 AM_CONDITIONAL(NO_UNDEFINED, test x$need_no_undefined = xyes)
+
+dnl **********************************************************************
+dnl check if this is the Intel ICC compiler, and if so make it stricter
+dnl (convert warning 147 into an error) so that it properly can detect the
+dnl gethostbyname_r() version
+dnl **********************************************************************
+CURL_DETECT_ICC([CFLAGS="$CFLAGS -we 147"])
 
 dnl **********************************************************************
 dnl Checks for libraries.
@@ -198,6 +238,77 @@ AC_HELP_STRING([--enable-libgcc],[use libgcc when linking]),
        AC_MSG_RESULT(no)
 )
 
+
+dnl Default is to try the thread-safe versions of a few functions
+OPT_THREAD=on
+
+dnl detect AIX 4.3 or later
+AC_MSG_CHECKING([AIX 4.3 or later])
+AC_PREPROC_IFELSE([
+#if defined(_AIX) && defined(_AIX43)
+printf("just fine");
+#else
+#error "this is not AIX 4.3 or later"
+#endif
+],
+ [ AC_MSG_RESULT([yes])
+   RECENTAIX=yes
+   OPT_THREAD=off ],
+ [ AC_MSG_RESULT([no]) ]
+)
+
+AC_ARG_ENABLE(thread,dnl
+AC_HELP_STRING([--disable-thread],[don't look for thread-safe functions])
+AC_HELP_STRING([--enable-thread],[look for thread-safe functions]),
+[ case "$enableval" in
+  no)
+    OPT_THREAD=off
+    AC_MSG_WARN(c-ares will not get built using thread-safe functions)
+    ;;
+  *)
+    ;;
+  esac
+]
+)
+
+if test X"$OPT_THREAD" = Xoff
+then
+  AC_DEFINE(DISABLED_THREADSAFE, 1,
+    [Set to explicitly specify we don't want to use thread-safe functions])
+fi
+
+dnl for recent AIX versions, we skip all the thread-safe checks above since
+dnl they claim a thread-safe libc using the standard API. But there are
+dnl some functions still not thread-safe. Check for these!
+
+dnl Let's hope this split URL remains working:
+dnl http://publibn.boulder.ibm.com/doc_link/en_US/a_doc_lib/aixprggd/ \
+dnl genprogc/thread_quick_ref.htm
+
+if test "x$RECENTAIX" = "xyes"; then
+
+  AC_DEFINE(_THREAD_SAFE, 1, [define this if you need it to compile thread-safe code])
+
+  dnl check if this is the IBM xlc compiler
+  dnl Details thanks to => http://predef.sourceforge.net/
+  AC_MSG_CHECKING([if this is the xlc compiler])
+  AC_EGREP_CPP([^__xlC__], [__xlC__],
+         dnl action if the text is found, this it has not been replaced by the
+         dnl cpp
+         XLC="no"
+         AC_MSG_RESULT([no]),
+         dnl the text was not found, it was replaced by the cpp
+         XLC="yes"
+         AC_MSG_RESULT([yes])
+         CFLAGS="$CFLAGS -qthreaded"
+         dnl AIX xlc has to have strict aliasing turned off. If not,
+         dnl the optimizer assumes that pointers can only point to
+         dnl an object of the same type.
+         CFLAGS="$CFLAGS -qnoansialias"
+       )
+fi
+
+
 dnl **********************************************************************
 dnl Back to "normal" configuring
 dnl **********************************************************************
@@ -229,6 +340,8 @@ AC_CHECK_HEADERS(
        netdb.h \
        netinet/in.h \
        net/if.h \
+       errno.h \
+       stdbool.h \
        arpa/nameser.h \
        arpa/nameser_compat.h \
        arpa/inet.h,
@@ -290,12 +403,29 @@ fi
 AC_CHECK_TYPE(ssize_t, ,
    AC_DEFINE(ssize_t, int, [the signed version of size_t]))
 
+# check for bool type
+AC_CHECK_TYPE([bool],[
+  AC_DEFINE(HAVE_BOOL_T, 1,
+    [Define to 1 if bool is an available type.])
+], ,[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_STDBOOL_H
+#include <stdbool.h>
+#endif
+])
+
 # Check for socklen_t or equivalent
 CURL_CHECK_TYPE_SOCKLEN_T
 
 TYPE_IN_ADDR_T
 
 TYPE_SOCKADDR_STORAGE
+
+TYPE_SIG_ATOMIC_T
+
+AC_TYPE_SIGNAL
 
 CURL_CHECK_FUNC_RECV
 
@@ -654,5 +784,21 @@ AC_C_BIGENDIAN(
     ,
     [AC_MSG_WARN([couldn't figure out endianess, assuming little endian!])]
 )
+
+dnl Check for user-specified random device
+AC_ARG_WITH(random,
+AC_HELP_STRING([--with-random=FILE],
+               [read randomness from FILE (default=/dev/urandom)]),
+    [ RANDOM_FILE="$withval" ],
+    [
+        dnl Check for random device
+        AC_CHECK_FILE("/dev/urandom", [ RANDOM_FILE="/dev/urandom"] )
+    ]
+)
+if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
+        AC_SUBST(RANDOM_FILE)
+        AC_DEFINE_UNQUOTED(RANDOM_FILE, "$RANDOM_FILE",
+        [a suitable file/device to read random data from])
+fi
 
 AC_OUTPUT(Makefile)

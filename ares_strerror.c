@@ -1,4 +1,4 @@
-/* $Id: ares_strerror.c,v 1.9 2006-07-22 15:37:10 giva Exp $ */
+/* $Id: ares_strerror.c,v 1.11 2007-02-21 19:03:20 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -41,9 +41,11 @@ const char *ares_strerror(int code)
     "Out of memory",
     "Channel is being destroyed",
     "Misformatted string",
-    "Illegal flags specified"
+    "Illegal flags specified",
+    "Given hostname is not numeric",
+    "Illegal hints flags specified"
   };
 
-  assert(code >= 0 && code < (int)(sizeof(errtext) / sizeof(*errtext)));
+  DEBUGASSERT(code >= 0 && code < (int)(sizeof(errtext) / sizeof(*errtext)));
   return errtext[code];
 }

@@ -1,4 +1,4 @@
-/* $Id: ares_mkquery.c,v 1.8 2006-07-22 15:37:10 giva Exp $ */
+/* $Id: ares_mkquery.c,v 1.11 2007-02-26 04:33:19 giva Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -16,7 +16,6 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -115,7 +114,12 @@ int ares_mkquery(const char *name, int dnsclass, int type, unsigned short id,
   memset(q, 0, HFIXEDSZ);
   DNS_HEADER_SET_QID(q, id);
   DNS_HEADER_SET_OPCODE(q, QUERY);
-  DNS_HEADER_SET_RD(q, (rd) ? 1 : 0);
+  if (rd) {
+    DNS_HEADER_SET_RD(q, 1);
+  }
+  else {
+    DNS_HEADER_SET_RD(q, 0);
+  }
   DNS_HEADER_SET_QDCOUNT(q, 1);
 
   /* A name of "." is a screw case for the loop below, so adjust it. */
@@ -141,7 +145,7 @@ int ares_mkquery(const char *name, int dnsclass, int type, unsigned short id,
         return ARES_EBADNAME;
 
       /* Encode the length and copy the data. */
-      *q++ = len;
+      *q++ = (unsigned char)len;
       for (p = name; *p && *p != '.'; p++)
         {
           if (*p == '\\' && *(p + 1) != 0)

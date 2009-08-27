@@ -1,4 +1,4 @@
-/* $Id: ares_dns.h,v 1.5 2006-06-19 06:41:55 wahern Exp $ */
+/* $Id: ares_dns.h,v 1.8 2007-02-16 14:22:08 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -21,12 +21,13 @@
 #define DNS__16BIT(p)                   (((p)[0] << 8) | (p)[1])
 #define DNS__32BIT(p)                   (((p)[0] << 24) | ((p)[1] << 16) | \
                                          ((p)[2] << 8) | (p)[3])
-#define DNS__SET16BIT(p, v)             (((p)[0] = ((v) >> 8) & 0xff), \
-                                         ((p)[1] = (v) & 0xff))
-#define DNS__SET32BIT(p, v)             (((p)[0] = ((v) >> 24) & 0xff), \
-                                         ((p)[1] = ((v) >> 16) & 0xff), \
-                                         ((p)[2] = ((v) >> 8) & 0xff), \
-                                         ((p)[3] = (v) & 0xff))
+
+#define DNS__SET16BIT(p, v)  (((p)[0] = (unsigned char)(((v) >> 8) & 0xff)), \
+                              ((p)[1] = (unsigned char)((v) & 0xff)))
+#define DNS__SET32BIT(p, v)  (((p)[0] = (unsigned char)(((v) >> 24) & 0xff)), \
+                              ((p)[1] = (unsigned char)(((v) >> 16) & 0xff)), \
+                              ((p)[2] = (unsigned char)(((v) >> 8) & 0xff)), \
+                              ((p)[3] = (unsigned char)((v) & 0xff)))
 
 #if 0
 /* we cannot use this approach on systems where we can't access 16/32 bit
@@ -53,19 +54,19 @@
 #define DNS_HEADER_ARCOUNT(h)           DNS__16BIT((h) + 10)
 
 /* Macros for constructing a DNS header */
-#define DNS_HEADER_SET_QID(h, v)        DNS__SET16BIT(h, v)
-#define DNS_HEADER_SET_QR(h, v)         ((h)[2] |= (((v) & 0x1) << 7))
-#define DNS_HEADER_SET_OPCODE(h, v)     ((h)[2] |= (((v) & 0xf) << 3))
-#define DNS_HEADER_SET_AA(h, v)         ((h)[2] |= (((v) & 0x1) << 2))
-#define DNS_HEADER_SET_TC(h, v)         ((h)[2] |= (((v) & 0x1) << 1))
-#define DNS_HEADER_SET_RD(h, v)         ((h)[2] |= (((v) & 0x1)))
-#define DNS_HEADER_SET_RA(h, v)         ((h)[3] |= (((v) & 0x1) << 7))
-#define DNS_HEADER_SET_Z(h, v)          ((h)[3] |= (((v) & 0x7) << 4))
-#define DNS_HEADER_SET_RCODE(h, v)      ((h)[3] |= (((v) & 0xf)))
-#define DNS_HEADER_SET_QDCOUNT(h, v)    DNS__SET16BIT((h) + 4, v)
-#define DNS_HEADER_SET_ANCOUNT(h, v)    DNS__SET16BIT((h) + 6, v)
-#define DNS_HEADER_SET_NSCOUNT(h, v)    DNS__SET16BIT((h) + 8, v)
-#define DNS_HEADER_SET_ARCOUNT(h, v)    DNS__SET16BIT((h) + 10, v)
+#define DNS_HEADER_SET_QID(h, v)      DNS__SET16BIT(h, v)
+#define DNS_HEADER_SET_QR(h, v)       ((h)[2] |= (unsigned char)(((v) & 0x1) << 7))
+#define DNS_HEADER_SET_OPCODE(h, v)   ((h)[2] |= (unsigned char)(((v) & 0xf) << 3))
+#define DNS_HEADER_SET_AA(h, v)       ((h)[2] |= (unsigned char)(((v) & 0x1) << 2))
+#define DNS_HEADER_SET_TC(h, v)       ((h)[2] |= (unsigned char)(((v) & 0x1) << 1))
+#define DNS_HEADER_SET_RD(h, v)       ((h)[2] |= (unsigned char)((v) & 0x1))
+#define DNS_HEADER_SET_RA(h, v)       ((h)[3] |= (unsigned char)(((v) & 0x1) << 7))
+#define DNS_HEADER_SET_Z(h, v)        ((h)[3] |= (unsigned char)(((v) & 0x7) << 4))
+#define DNS_HEADER_SET_RCODE(h, v)    ((h)[3] |= (unsigned char)((v) & 0xf))
+#define DNS_HEADER_SET_QDCOUNT(h, v)  DNS__SET16BIT((h) + 4, v)
+#define DNS_HEADER_SET_ANCOUNT(h, v)  DNS__SET16BIT((h) + 6, v)
+#define DNS_HEADER_SET_NSCOUNT(h, v)  DNS__SET16BIT((h) + 8, v)
+#define DNS_HEADER_SET_ARCOUNT(h, v)  DNS__SET16BIT((h) + 10, v)
 
 /* Macros for parsing the fixed part of a DNS question */
 #define DNS_QUESTION_TYPE(q)            DNS__16BIT(q)

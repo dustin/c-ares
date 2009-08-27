@@ -1,4 +1,4 @@
-/* $Id: ares_query.c,v 1.8 2006-07-22 15:37:10 giva Exp $ */
+/* $Id: ares_query.c,v 1.11 2007-06-04 21:26:30 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -16,7 +16,6 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -40,6 +39,64 @@ struct qquery {
 
 static void qcallback(void *arg, int status, unsigned char *abuf, int alen);
 
+void ares__rc4(rc4_key* key, unsigned char *buffer_ptr, int buffer_len)
+{
+  unsigned char x;
+  unsigned char y;
+  unsigned char* state;
+  unsigned char xorIndex;
+  short counter;
+
+  x = key->x;
+  y = key->y;
+
+  state = &key->state[0];
+  for(counter = 0; counter < buffer_len; counter ++)
+  {
+	x = (x + 1) % 256;
+	y = (state[x] + y) % 256;
+	ARES_SWAP_BYTE(&state[x], &state[y]);
+
+	xorIndex = (state[x] + state[y]) % 256;
+
+	buffer_ptr[counter] ^= state[xorIndex];
+  }
+  key->x = x;
+  key->y = y;
+}
+
+static struct query* find_query_by_id(ares_channel channel, int id)
+{
+  int qid;
+  struct query* q;
+  DNS_HEADER_SET_QID(((unsigned char*)&qid), id);
+
+  /* Find the query corresponding to this packet. */
+  for (q = channel->queries; q; q = q->next)
+  {
+	if (q->qid == qid)
+	  return q;
+  }
+  return NULL;
+}
+
+
+/* a unique query id is generated using an rc4 key. Since the id may already
+   be used by a running query (as infrequent as it may be), a lookup is
+   performed per id generation. In practice this search should happen only
+   once per newly generated id
+*/
+static int generate_unique_id(ares_channel channel)
+{
+  int id;
+
+  do {
+	id = ares__generate_new_id(&channel->id_key);
+  } while (find_query_by_id(channel,id));
+
+  return id;
+}
+
 void ares_query(ares_channel channel, const char *name, int dnsclass,
                 int type, ares_callback callback, void *arg)
 {
@@ -51,12 +108,13 @@ void ares_query(ares_channel channel, const char *name, int dnsclass,
   rd = !(channel->flags & ARES_FLAG_NORECURSE);
   status = ares_mkquery(name, dnsclass, type, channel->next_id, rd, &qbuf,
                         &qlen);
-  channel->next_id++;
   if (status != ARES_SUCCESS)
     {
       callback(arg, status, NULL, 0);
       return;
     }
+
+  channel->next_id = generate_unique_id(channel);
 
   /* Allocate and fill in the query structure. */
   qquery = malloc(sizeof(struct qquery));

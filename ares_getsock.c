@@ -1,6 +1,6 @@
-/* $Id: ares_getsock.c,v 1.3 2006-10-12 16:47:50 bagder Exp $ */
+/* $Id: ares_getsock.c,v 1.5 2007-04-03 18:25:18 yangtse Exp $ */
 
-/* Copyright (C) 2005 - 2006, Daniel Stenberg
+/* Copyright (C) 2005 - 2007, Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -14,7 +14,6 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>

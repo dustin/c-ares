@@ -1,5 +1,122 @@
   Changelog for the c-ares project
 
+Version 1.4.0 (June 8, 2007)
+
+* June 4 2007 (Daniel Stenberg)
+
+- James Bursa reported a major memory problem when resolving multi-IP names
+  and I found and fixed the problem. It was added by Ashish Sharma's patch
+  two days ago.
+
+  When I then tried to verify multiple entries in /etc/hosts after my fix, I
+  got another segfault and decided this code was not ripe for inclusion and I
+  reverted the patch.
+
+* June 2 2007
+
+- Brad Spencer found and fixed three flaws in the code, found with the new
+  gcc 4.2.0 warning: -Waddress
+
+- Brad House fixed VS2005 compiler warnings due to time_t being 64bit.
+  He also made recent Microsoft compilers use _strdup() instead of strdup().
+
+- Brad House's man pages for ares_save_options() and ares_destroy_options()
+  were added.
+
+- Ashish Sharma provided a patch for supporting multiple entries in the
+  /etc/hosts file. Patch edited for coding style and functionality by me
+  (Daniel).
+
+* May 30 2007
+
+- Shmulik Regev brought cryptographically secure transaction IDs:
+
+  The c-ares library implementation uses a DNS "Transaction ID" field that is
+  seeded with a pseudo random number (based on gettimeofday) which is
+  incremented (++) between consecutive calls and is therefore rather
+  predictable. In general, predictability of DNS Transaction ID is a well
+  known security problem (e.g.
+  http://bak.spc.org/dms/archive/dns_id_attack.txt) and makes a c-ares based
+  implementation vulnerable to DNS poisoning. Credit goes to Amit Klein
+  (Trusteer) for identifying this problem.
+
+  The patch I wrote changes the implementation to use a more secure way of
+  generating unique IDs. It starts by obtaining a key with reasonable entropy
+  which is used with an RC4 stream to generate the cryptographically secure
+  transaction IDs.
+
+  Note that the key generation code (in ares_init:randomize_key) has two
+  versions, the Windows specific one uses a cryptographically safe function
+  provided (but undocumented :) by the operating system (described at
+  http://blogs.msdn.com/michael_howard/archive/2005/01/14/353379.aspx).  The
+  default implementation is a bit naive and uses the standard 'rand'
+  function. Surely a better way to generate random keys exists for other
+  platforms.
+
+  The patch can be tested by using the adig utility and using the '-s' option.
+
+- Brad House added ares_save_options() and ares_destroy_options() that can be
+  used to keep options for later re-usal when ares_init_options() is used.
+  
+  Problem: Calling ares_init() for each lookup can be unnecessarily resource
+         intensive.  On windows, it must LoadLibrary() or search the registry
+         on each call to ares_init().  On unix, it must read and parse
+         multiple files to obtain the necessary configuration information.  In
+         a single-threaded environment, it would make sense to only
+         ares_init() once, but in a heavily multi-threaded environment, it is
+         undesirable to ares_init() and ares_destroy() for each thread created
+         and track that.
+
+  Solution: Create ares_save_options() and ares_destroy_options() functions to
+         retrieve and free options obtained from an initialized channel.  The
+         options populated can be used to pass back into ares_init_options(),
+         it should populate all needed fields and not retrieve any information
+         from the system.  Probably wise to destroy the cache every minute or
+         so to prevent the data from becoming stale.
+
+- Daniel S added ares_process_fd() to allow applications to ask for processing
+  on specific sockets and thus avoiding select() and associated
+  functions/macros.  This function will be used by upcoming libcurl releases
+  for this very reason. It also made me export the ares_socket_t type in the
+  public ares.h header file, since ares_process_fd() uses that type for two of
+  the arguments.
+
+* May 25 2007
+
+- Ravi Pratap fixed a flaw in the init_by_resolv_conf() function for windows
+  that could cause it to return a bad return code.
+
+* April 16 2007
+
+- Yang Tse: Provide ares_getopt() command-line parser function as a source
+  code helper function, not belonging to the actual c-ares library.
+
+* February 19 2007
+
+- Vlad Dinulescu added ares_parse_ns_reply().
+
+* February 13 2007
+
+- Yang Tse: Fix failure to get the search sequence of /etc/hosts and
+  DNS from /etc/nsswitch.conf, /etc/host.conf or /etc/svc.conf when
+  /etc/resolv.conf did not exist or was unable to read it.
+
+* November 22 2006
+
+- Install ares_dns.h too
+
+- Michael Wallner fixed this problem: When I set domains in the options
+  struct, and there are domain/search entries in /etc/resolv.conf, the domains
+  of the options struct will be overridden.
+
+* November 6 2006
+
+- Yang Tse removed a couple of potential zero size memory allocations.
+
+- Andreas Rieke fixed the line endings in the areslib.dsp file that I (Daniel)
+  broke in the 1.3.2 release. We should switch to a system where that file is
+  auto-generated. We could rip some code for that from curl...
+
 Version 1.3.2 (November 3, 2006)
 
 * October 12 2006

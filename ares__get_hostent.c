@@ -1,4 +1,4 @@
-/* $Id: ares__get_hostent.c,v 1.12 2006-10-18 03:42:06 yangtse Exp $ */
+/* $Id: ares__get_hostent.c,v 1.14 2007-06-02 19:42:25 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -16,7 +16,6 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if !defined(WIN32) || defined(WATT32)
 #include <sys/socket.h>
@@ -184,6 +183,7 @@ int ares__get_hostent(FILE *fp, int family, struct hostent **host)
             free(hostent->h_addr_list);
           free(hostent);
         }
+      *host = NULL;
       return ARES_ENOMEM;
     }
 

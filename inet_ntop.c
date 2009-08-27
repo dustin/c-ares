@@ -1,4 +1,4 @@
-/* $Id: inet_ntop.c,v 1.7 2006-08-04 17:35:05 yangtse Exp $ */
+/* $Id: inet_ntop.c,v 1.9 2007-02-26 04:33:19 giva Exp $ */
 
 /* Copyright (c) 1996 by Internet Software Consortium.
  *
@@ -17,8 +17,6 @@
  */
 
 #include "setup.h"
-
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
@@ -68,6 +66,11 @@ static const char *inet_ntop6(const unsigned char *src, char *dst, size_t size);
  *     convert a network format address to presentation format.
  * return:
  *     pointer to presentation format address (`dst'), or NULL (see errno).
+ * note:
+ *      On Windows we store the error in the thread errno, not
+ *      in the winsock error code. This is to avoid loosing the
+ *      actual last winsock error. So use macro ERRNO to fetch the
+ *      errno this funtion sets when returning NULL, not SOCKERRNO.
  * author:
  *     Paul Vixie, 1996.
  */
@@ -81,7 +84,7 @@ ares_inet_ntop(int af, const void *src, char *dst, size_t size)
     case AF_INET6:
       return (inet_ntop6(src, dst, size));
     default:
-      errno = EAFNOSUPPORT;
+      SET_ERRNO(EAFNOSUPPORT);
       return (NULL);
     }
   /* NOTREACHED */
@@ -106,7 +109,7 @@ inet_ntop4(const unsigned char *src, char *dst, size_t size)
 
   if (SPRINTF((tmp, fmt, src[0], src[1], src[2], src[3])) > size)
     {
-      errno = ENOSPC;
+      SET_ERRNO(ENOSPC);
       return (NULL);
     }
     strcpy(dst, tmp);
@@ -218,7 +221,7 @@ inet_ntop6(const unsigned char *src, char *dst, size_t size)
    */
   if ((size_t)(tp - tmp) > size)
     {
-      errno = ENOSPC;
+      SET_ERRNO(ENOSPC);
       return (NULL);
     }
   strcpy(dst, tmp);

@@ -1,4 +1,4 @@
-/* $Id: ares_destroy.c,v 1.7 2006-07-22 15:37:10 giva Exp $ */
+/* $Id: ares_destroy.c,v 1.9 2007-05-30 20:49:14 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -20,28 +20,55 @@
 #include "ares.h"
 #include "ares_private.h"
 
+void ares_destroy_options(struct ares_options *options)
+{
+  int i;
+
+  free(options->servers);
+  for (i = 0; i < options->ndomains; i++)
+    free(options->domains[i]);
+  free(options->domains);
+  if(options->sortlist)
+    free(options->sortlist);
+  free(options->lookups);
+}
+
 void ares_destroy(ares_channel channel)
 {
   int i;
   struct query *query;
 
-  for (i = 0; i < channel->nservers; i++)
-    ares__close_sockets(channel, &channel->servers[i]);
-  free(channel->servers);
-  for (i = 0; i < channel->ndomains; i++)
-    free(channel->domains[i]);
-  free(channel->domains);
+  if (!channel)
+    return;
+
+  if (channel->servers) {
+    for (i = 0; i < channel->nservers; i++)
+      ares__close_sockets(channel, &channel->servers[i]);
+    free(channel->servers);
+  }
+
+  if (channel->domains) {
+    for (i = 0; i < channel->ndomains; i++)
+      free(channel->domains[i]);
+    free(channel->domains);
+  }
+
   if(channel->sortlist)
     free(channel->sortlist);
-  free(channel->lookups);
-  while (channel->queries)
-    {
-      query = channel->queries;
-      channel->queries = query->next;
-      query->callback(query->arg, ARES_EDESTRUCTION, NULL, 0);
+
+  if (channel->lookups)
+    free(channel->lookups);
+
+  while (channel->queries) {
+    query = channel->queries;
+    channel->queries = query->next;
+    query->callback(query->arg, ARES_EDESTRUCTION, NULL, 0);
+    if (query->tcpbuf)
       free(query->tcpbuf);
+    if (query->skip_server)
       free(query->skip_server);
-      free(query);
-    }
+    free(query);
+  }
+
   free(channel);
 }

@@ -1,6 +1,6 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
- * $Id: adig.c,v 1.15 2006-10-31 17:51:54 giva Exp $
+ * $Id: adig.c,v 1.24 2007-04-16 15:35:34 yangtse Exp $
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -16,21 +16,21 @@
  */
 
 #include "setup.h"
-#include <sys/types.h>
 
 #if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
 #else
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#include <netdb.h>
 #endif
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
+#include <netdb.h>
 #endif
 
 #include <stdio.h>
@@ -42,23 +42,15 @@
 #include "ares.h"
 #include "ares_dns.h"
 #include "inet_ntop.h"
+#include "ares_getopt.h"
 
 #ifdef WATT32
 #undef WIN32  /* Redefined in MingW headers */
 #endif
 
-#ifndef INADDR_NONE
-#define INADDR_NONE 0xffffffff
-#endif
-
 /* Mac OS X portability check */
 #ifndef T_SRV
 #define T_SRV 33 /* server selection */
-#endif
-
-#ifndef optind
-extern int optind;
-extern char *optarg;
 #endif
 
 struct nv {
@@ -164,7 +156,7 @@ int main(int argc, char **argv)
   options.flags = ARES_FLAG_NOCHECKRESP;
   options.servers = NULL;
   options.nservers = 0;
-  while ((c = getopt(argc, argv, "df:s:c:t:T:U:")) != -1)
+  while ((c = ares_getopt(argc, argv, "df:s:c:t:T:U:")) != -1)
     {
       switch (c)
         {
@@ -285,7 +277,7 @@ int main(int argc, char **argv)
         break;
       tvp = ares_timeout(channel, NULL, &tv);
       count = select(nfds, &read_fds, &write_fds, NULL, tvp);
-      if (count < 0 && errno != EINVAL)
+      if (count < 0 && SOCKERRNO != EINVAL)
         {
           perror("select");
           return 1;
@@ -294,6 +286,11 @@ int main(int argc, char **argv)
     }
 
   ares_destroy(channel);
+
+#ifdef USE_WINSOCK
+  WSACleanup();
+#endif
+
   return 0;
 }
 
@@ -551,8 +548,9 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (p + 20 > aptr + dlen)
         return NULL;
       printf("\t\t\t\t\t\t( %lu %lu %lu %lu %lu )",
-             DNS__32BIT(p), DNS__32BIT(p+4), DNS__32BIT(p+8),
-             DNS__32BIT(p+12), DNS__32BIT(p+16));
+             (unsigned long)DNS__32BIT(p), (unsigned long)DNS__32BIT(p+4),
+             (unsigned long)DNS__32BIT(p+8), (unsigned long)DNS__32BIT(p+12),
+             (unsigned long)DNS__32BIT(p+16));
       break;
 
     case T_TXT:
