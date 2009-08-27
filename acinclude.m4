@@ -7,19 +7,19 @@ dnl Check for compilable and valid windows.h header
 AC_DEFUN([CURL_CHECK_HEADER_WINDOWS], [
   AC_CACHE_CHECK([for windows.h], [ac_cv_header_windows_h], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-      ],[
-#ifdef __CYGWIN__
+      ]],[[
+#if defined(__CYGWIN__) || defined(__CEGCC__)
         HAVE_WINDOWS_H shall not be defined.
 #else
         int dummy=2*WINVER;
 #endif
-      ])
+      ]])
     ],[
       ac_cv_header_windows_h="yes"
     ],[
@@ -37,6 +37,41 @@ AC_DEFUN([CURL_CHECK_HEADER_WINDOWS], [
 ])
 
 
+dnl CURL_CHECK_NATIVE_WINDOWS
+dnl -------------------------------------------------
+dnl Check if building a native Windows target
+
+AC_DEFUN([CURL_CHECK_NATIVE_WINDOWS], [
+  AC_REQUIRE([CURL_CHECK_HEADER_WINDOWS])dnl
+  AC_CACHE_CHECK([whether build target is a native Windows one], [ac_cv_native_windows], [
+    if test "$ac_cv_header_windows_h" = "no"; then
+      ac_cv_native_windows="no"
+    else
+      AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+        ]],[[
+#if defined(__MINGW32__) || defined(__MINGW32CE__)
+          int dummy=1;
+#else
+          Not a native Windows build target.
+#endif
+        ]])
+      ],[
+        ac_cv_native_windows="yes"
+      ],[
+        ac_cv_native_windows="no"
+      ])
+    fi
+  ])
+  case "$ac_cv_native_windows" in
+    yes)
+      AC_DEFINE_UNQUOTED(NATIVE_WINDOWS, 1,
+        [Define to 1 if you are building a native Windows target.])
+      ;;
+  esac
+])
+
+
 dnl CURL_CHECK_HEADER_WINSOCK
 dnl -------------------------------------------------
 dnl Check for compilable and valid winsock.h header 
@@ -45,20 +80,20 @@ AC_DEFUN([CURL_CHECK_HEADER_WINSOCK], [
   AC_REQUIRE([CURL_CHECK_HEADER_WINDOWS])dnl
   AC_CACHE_CHECK([for winsock.h], [ac_cv_header_winsock_h], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
 #include <winsock.h>
-      ],[
-#ifdef __CYGWIN__
+      ]],[[
+#if defined(__CYGWIN__) || defined(__CEGCC__)
         HAVE_WINSOCK_H shall not be defined.
 #else
         int dummy=WSACleanup();
 #endif
-      ])
+      ]])
     ],[
       ac_cv_header_winsock_h="yes"
     ],[
@@ -82,20 +117,20 @@ AC_DEFUN([CURL_CHECK_HEADER_WINSOCK2], [
   AC_REQUIRE([CURL_CHECK_HEADER_WINDOWS])dnl
   AC_CACHE_CHECK([for winsock2.h], [ac_cv_header_winsock2_h], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
 #include <winsock2.h>
-      ],[
-#ifdef __CYGWIN__
+      ]],[[
+#if defined(__CYGWIN__) || defined(__CEGCC__) || defined(__MINGW32CE__)
         HAVE_WINSOCK2_H shall not be defined.
 #else
         int dummy=2*IPPROTO_ESP;
 #endif
-      ])
+      ]])
     ],[
       ac_cv_header_winsock2_h="yes"
     ],[
@@ -119,7 +154,7 @@ AC_DEFUN([CURL_CHECK_HEADER_WS2TCPIP], [
   AC_REQUIRE([CURL_CHECK_HEADER_WINSOCK2])dnl
   AC_CACHE_CHECK([for ws2tcpip.h], [ac_cv_header_ws2tcpip_h], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -127,13 +162,13 @@ AC_DEFUN([CURL_CHECK_HEADER_WS2TCPIP], [
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-      ],[
-#ifdef __CYGWIN__
+      ]],[[
+#if defined(__CYGWIN__) || defined(__CEGCC__) || defined(__MINGW32CE__)
         HAVE_WS2TCPIP_H shall not be defined.
 #else
         int dummy=2*IP_PKTINFO;
 #endif
-      ])
+      ]])
     ],[
       ac_cv_header_ws2tcpip_h="yes"
     ],[
@@ -157,14 +192,14 @@ dnl and check if it is needed even with stdlib.h
 AC_DEFUN([CURL_CHECK_HEADER_MALLOC], [
   AC_CACHE_CHECK([for malloc.h], [ac_cv_header_malloc_h], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #include <malloc.h>
-      ],[
+      ]],[[
         void *p = malloc(10);
         void *q = calloc(10,10);
         free(p);
         free(q);
-      ])
+      ]])
     ],[
       ac_cv_header_malloc_h="yes"
     ],[
@@ -176,14 +211,14 @@ AC_DEFUN([CURL_CHECK_HEADER_MALLOC], [
       [Define to 1 if you have the malloc.h header file.])
     #
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #include <stdlib.h>
-      ],[
+      ]],[[
         void *p = malloc(10);
         void *q = calloc(10,10);
         free(p);
         free(q);
-      ])
+      ]])
     ],[
       curl_cv_need_header_malloc_h="no"
     ],[
@@ -208,13 +243,15 @@ dnl an equivalent type if socklen_t not available
 AC_DEFUN([CURL_CHECK_TYPE_SOCKLEN_T], [
   AC_REQUIRE([CURL_CHECK_HEADER_WS2TCPIP])dnl
   AC_CHECK_TYPE([socklen_t], ,[
-    AC_CACHE_CHECK([for socklen_t equivalent], 
+    dnl socklen_t not available
+    AC_CACHE_CHECK([for socklen_t equivalent],
       [curl_cv_socklen_t_equiv], [
       curl_cv_socklen_t_equiv="unknown"
-      for arg2 in "struct sockaddr" void; do
-        for t in int size_t unsigned long "unsigned long"; do
-          AC_COMPILE_IFELSE([
-            AC_LANG_PROGRAM([
+      for arg1 in 'int' 'SOCKET'; do
+        for arg2 in "struct sockaddr" void; do
+          for t in int size_t unsigned long "unsigned long"; do
+            AC_COMPILE_IFELSE([
+              AC_LANG_PROGRAM([[
 #undef inline
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -228,6 +265,7 @@ AC_DEFUN([CURL_CHECK_TYPE_SOCKLEN_T], [
 #include <winsock.h>
 #endif
 #endif
+#define GETPEERNCALLCONV PASCAL
 #else
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -235,16 +273,18 @@ AC_DEFUN([CURL_CHECK_TYPE_SOCKLEN_T], [
 #ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
+#define GETPEERNCALLCONV
 #endif
-              int getpeername (int, $arg2 *, $t *);
+                extern int GETPEERNCALLCONV getpeername ($arg1, $arg2 *, $t *);
+              ]],[[
+                $t len=0;
+                getpeername(0,0,&len);
+              ]])
             ],[
-              $t len=0;
-              getpeername(0,0,&len);
+               curl_cv_socklen_t_equiv="$t"
+               break 3
             ])
-          ],[
-             curl_cv_socklen_t_equiv="$t"
-             break 2
-          ])
+          done
         done
       done
     ])
@@ -254,7 +294,7 @@ AC_DEFUN([CURL_CHECK_TYPE_SOCKLEN_T], [
         ;;
       *)
         AC_DEFINE_UNQUOTED(socklen_t, $curl_cv_socklen_t_equiv,
-          [type to use in place of socklen_t if not defined])
+          [Type to use in place of socklen_t when system does not provide it.])
         ;;
     esac
   ],[
@@ -300,32 +340,35 @@ AC_DEFUN([CURL_CHECK_FUNC_GETNAMEINFO], [
   #
   AC_MSG_CHECKING([for getnameinfo])
   AC_LINK_IFELSE([
-      AC_LANG_FUNC_LINK_TRY([getnameinfo])
-    ],[
-      AC_MSG_RESULT([yes])
-      curl_cv_getnameinfo="yes"
-    ],[
-      AC_MSG_RESULT([no])
-      curl_cv_getnameinfo="no"
+    AC_LANG_FUNC_LINK_TRY([getnameinfo])
+  ],[
+    AC_MSG_RESULT([yes])
+    curl_cv_getnameinfo="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    curl_cv_getnameinfo="no"
   ])
   #
   if test "$curl_cv_getnameinfo" != "yes"; then
     AC_MSG_CHECKING([deeper for getnameinfo])
-    AC_TRY_LINK([
-      ],[
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([[
+      ]],[[
         getnameinfo();
-      ],[
-        AC_MSG_RESULT([yes])
-        curl_cv_getnameinfo="yes"
-      ],[
-        AC_MSG_RESULT([but still no])
-        curl_cv_getnameinfo="no"
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      curl_cv_getnameinfo="yes"
+    ],[
+      AC_MSG_RESULT([but still no])
+      curl_cv_getnameinfo="no"
     ])
   fi
   #
   if test "$curl_cv_getnameinfo" != "yes"; then
     AC_MSG_CHECKING([deeper and deeper for getnameinfo])
-    AC_TRY_LINK([
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([[
 #undef inline
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -349,14 +392,15 @@ AC_DEFUN([CURL_CHECK_FUNC_GETNAMEINFO], [
 #include <netdb.h>
 #endif
 #endif
-      ],[
+      ]],[[
         getnameinfo(0, 0, 0, 0, 0, 0, 0);
-      ],[ 
-        AC_MSG_RESULT([yes])
-        curl_cv_getnameinfo="yes"
-      ],[
-        AC_MSG_RESULT([but still no])
-        curl_cv_getnameinfo="no"
+      ]])
+    ],[
+      AC_MSG_RESULT([yes])
+      curl_cv_getnameinfo="yes"
+    ],[
+      AC_MSG_RESULT([but still no])
+      curl_cv_getnameinfo="no"
     ])
   fi
   #
@@ -369,7 +413,7 @@ AC_DEFUN([CURL_CHECK_FUNC_GETNAMEINFO], [
           for gni_arg46 in 'size_t' 'int' 'socklen_t' 'unsigned int' 'DWORD'; do
             for gni_arg7 in 'int' 'unsigned int'; do
               AC_COMPILE_IFELSE([
-                AC_LANG_PROGRAM([
+                AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -403,13 +447,13 @@ AC_DEFUN([CURL_CHECK_FUNC_GETNAMEINFO], [
                                          char *, $gni_arg46,
                                          char *, $gni_arg46,
                                          $gni_arg7);
-                ],[
+                ]],[[
                   $gni_arg2 salen=0;
                   $gni_arg46 hostlen=0;
                   $gni_arg46 servlen=0;
                   $gni_arg7 flags=0;
                   int res = getnameinfo(0, salen, 0, hostlen, 0, servlen, flags);
-                ])
+                ]])
               ],[
                  curl_cv_func_getnameinfo_args="$gni_arg1,$gni_arg2,$gni_arg46,$gni_arg7"
                  break 4
@@ -530,7 +574,7 @@ AC_DEFUN([CURL_CHECK_NI_WITHSCOPEID], [
   AC_CACHE_CHECK([for working NI_WITHSCOPEID], 
     [ac_cv_working_ni_withscopeid], [
     AC_RUN_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #ifdef HAVE_STDIO_H
 #include <stdio.h>
 #endif
@@ -549,7 +593,7 @@ AC_DEFUN([CURL_CHECK_NI_WITHSCOPEID], [
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
-      ],[
+      ]],[[
 #if defined(NI_WITHSCOPEID) && defined(HAVE_GETNAMEINFO)
 #ifdef HAVE_STRUCT_SOCKADDR_STORAGE
         struct sockaddr_storage sa;
@@ -580,7 +624,7 @@ AC_DEFUN([CURL_CHECK_NI_WITHSCOPEID], [
 #else
         return 4; /* Error, NI_WITHSCOPEID not defined or no getnameinfo() */
 #endif
-      ]) # AC_LANG_PROGRAM
+      ]]) # AC_LANG_PROGRAM
     ],[
       # Exit code == 0. Program worked.
       ac_cv_working_ni_withscopeid="yes"
@@ -591,13 +635,13 @@ AC_DEFUN([CURL_CHECK_NI_WITHSCOPEID], [
       # Program is not run when cross-compiling. So we assume
       # NI_WITHSCOPEID will work if we are able to compile it.
       AC_COMPILE_IFELSE([
-        AC_LANG_PROGRAM([
+        AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-        ],[
+        ]],[[
           unsigned int dummy= NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-        ])
+        ]])
       ],[
         ac_cv_working_ni_withscopeid="yes"
       ],[
@@ -630,7 +674,8 @@ AC_DEFUN([CURL_CHECK_FUNC_RECV], [
   AC_CHECK_HEADERS(sys/types.h sys/socket.h)
   #
   AC_MSG_CHECKING([for recv])
-  AC_TRY_LINK([
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -652,14 +697,15 @@ AC_DEFUN([CURL_CHECK_FUNC_RECV], [
 #include <sys/socket.h>
 #endif
 #endif
-    ],[
+    ]],[[
       recv(0, 0, 0, 0);
-    ],[ 
-      AC_MSG_RESULT([yes])
-      curl_cv_recv="yes"
-    ],[
-      AC_MSG_RESULT([no])
-      curl_cv_recv="no"
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    curl_cv_recv="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    curl_cv_recv="no"
   ])
   #
   if test "$curl_cv_recv" = "yes"; then
@@ -672,7 +718,7 @@ AC_DEFUN([CURL_CHECK_FUNC_RECV], [
             for recv_arg3 in 'size_t' 'int' 'socklen_t' 'unsigned int'; do
               for recv_arg4 in 'int' 'unsigned int'; do
                 AC_COMPILE_IFELSE([
-                  AC_LANG_PROGRAM([
+                  AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -697,13 +743,13 @@ AC_DEFUN([CURL_CHECK_FUNC_RECV], [
 #define RECVCALLCONV
 #endif
                     extern $recv_retv RECVCALLCONV recv($recv_arg1, $recv_arg2, $recv_arg3, $recv_arg4);
-                  ],[
+                  ]],[[
                     $recv_arg1 s=0;
                     $recv_arg2 buf=0;
                     $recv_arg3 len=0;
                     $recv_arg4 flags=0;
                     $recv_retv res = recv(s, buf, len, flags);
-                  ])
+                  ]])
                 ],[
                    curl_cv_func_recv_args="$recv_arg1,$recv_arg2,$recv_arg3,$recv_arg4,$recv_retv"
                    break 5
@@ -760,7 +806,8 @@ AC_DEFUN([CURL_CHECK_FUNC_SEND], [
   AC_CHECK_HEADERS(sys/types.h sys/socket.h)
   #
   AC_MSG_CHECKING([for send])
-  AC_TRY_LINK([
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -782,14 +829,15 @@ AC_DEFUN([CURL_CHECK_FUNC_SEND], [
 #include <sys/socket.h>
 #endif
 #endif
-    ],[
+    ]],[[
       send(0, 0, 0, 0);
-    ],[ 
-      AC_MSG_RESULT([yes])
-      curl_cv_send="yes"
-    ],[
-      AC_MSG_RESULT([no])
-      curl_cv_send="no"
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    curl_cv_send="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    curl_cv_send="no"
   ])
   #
   if test "$curl_cv_send" = "yes"; then
@@ -802,7 +850,7 @@ AC_DEFUN([CURL_CHECK_FUNC_SEND], [
             for send_arg3 in 'size_t' 'int' 'socklen_t' 'unsigned int'; do
               for send_arg4 in 'int' 'unsigned int'; do
                 AC_COMPILE_IFELSE([
-                  AC_LANG_PROGRAM([
+                  AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -827,12 +875,12 @@ AC_DEFUN([CURL_CHECK_FUNC_SEND], [
 #define SENDCALLCONV
 #endif
                     extern $send_retv SENDCALLCONV send($send_arg1, $send_arg2, $send_arg3, $send_arg4);
-                  ],[
+                  ]],[[
                     $send_arg1 s=0;
                     $send_arg3 len=0;
                     $send_arg4 flags=0;
                     $send_retv res = send(s, 0, len, flags);
-                  ])
+                  ]])
                 ],[
                    curl_cv_func_send_args="$send_arg1,$send_arg2,$send_arg3,$send_arg4,$send_retv"
                    break 5
@@ -914,7 +962,7 @@ AC_DEFUN([CURL_CHECK_MSG_NOSIGNAL], [
   AC_CHECK_HEADERS(sys/types.h sys/socket.h)
   AC_CACHE_CHECK([for MSG_NOSIGNAL], [ac_cv_msg_nosignal], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -936,9 +984,9 @@ AC_DEFUN([CURL_CHECK_MSG_NOSIGNAL], [
 #include <sys/socket.h>
 #endif
 #endif
-      ],[
+      ]],[[
         int flag=MSG_NOSIGNAL;
-      ])
+      ]])
     ],[
       ac_cv_msg_nosignal="yes"
     ],[
@@ -965,7 +1013,7 @@ AC_DEFUN([CURL_CHECK_STRUCT_TIMEVAL], [
   AC_CHECK_HEADERS(sys/types.h sys/time.h time.h)
   AC_CACHE_CHECK([for struct timeval], [ac_cv_struct_timeval], [
     AC_COMPILE_IFELSE([
-      AC_LANG_PROGRAM([
+      AC_LANG_PROGRAM([[
 #undef inline 
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -993,11 +1041,11 @@ AC_DEFUN([CURL_CHECK_STRUCT_TIMEVAL], [
 #include <time.h>
 #endif
 #endif
-      ],[
+      ]],[[
         struct timeval ts;
         ts.tv_sec  = 0;
         ts.tv_usec = 0;
-      ])
+      ]])
     ],[
       ac_cv_struct_timeval="yes"
     ],[
@@ -1032,18 +1080,20 @@ AC_DEFUN([TYPE_SIG_ATOMIC_T], [
     yes)
       #
       AC_MSG_CHECKING([if sig_atomic_t is already defined as volatile])
-      AC_TRY_LINK([
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
-        ],[
+        ]],[[
           static volatile sig_atomic_t dummy = 0;
-        ],[ 
-          AC_MSG_RESULT([no])
-          ac_cv_sig_atomic_t_volatile="no"
-        ],[
-          AC_MSG_RESULT([yes])
-          ac_cv_sig_atomic_t_volatile="yes"
+        ]])
+      ],[
+        AC_MSG_RESULT([no])
+        ac_cv_sig_atomic_t_volatile="no"
+      ],[
+        AC_MSG_RESULT([yes])
+        ac_cv_sig_atomic_t_volatile="yes"
       ])
       #
       if test "$ac_cv_sig_atomic_t_volatile" = "yes"; then
@@ -1065,20 +1115,20 @@ dnl
 dnl There are two known platforms (AIX 3.x and SunOS 4.1.x) where the
 dnl O_NONBLOCK define is found but does not work. This condition is attempted
 dnl to get caught in this script by using an excessive number of #ifdefs...
-dnl
-AC_DEFUN([CURL_CHECK_NONBLOCKING_SOCKET],
-[
-  AC_MSG_CHECKING([non-blocking sockets style])
 
-  AC_TRY_COMPILE([
+AC_DEFUN([CURL_CHECK_NONBLOCKING_SOCKET], [
+  AC_MSG_CHECKING([non-blocking sockets style])
+  nonblock="unknown"
+  #
+  AC_COMPILE_IFELSE([
+    AC_LANG_PROGRAM([[
 /* headers for O_NONBLOCK test */
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
-],[
-/* try to compile O_NONBLOCK */
-
-#if defined(sun) || defined(__sun__) || defined(__SUNPRO_C) || defined(__SUNPRO_CC)
+/* */
+#if defined(sun) || defined(__sun__) || \
+    defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 # if defined(__SVR4) || defined(__srv4__)
 #  define PLATFORM_SOLARIS
 # else
@@ -1088,36 +1138,44 @@ AC_DEFUN([CURL_CHECK_NONBLOCKING_SOCKET],
 #if (defined(_AIX) || defined(__xlC__)) && !defined(_AIX41)
 # define PLATFORM_AIX_V3
 #endif
-
+/* */
 #if defined(PLATFORM_SUNOS4) || defined(PLATFORM_AIX_V3) || defined(__BEOS__)
 #error "O_NONBLOCK does not work on this platform"
 #endif
-  int socket;
-  int flags = fcntl(socket, F_SETFL, flags | O_NONBLOCK);
-],[
-dnl the O_NONBLOCK test was fine
-nonblock="O_NONBLOCK"
-AC_DEFINE(HAVE_O_NONBLOCK, 1, [use O_NONBLOCK for non-blocking sockets])
-],[
-dnl the code was bad, try a different program now, test 2
-
-  AC_TRY_COMPILE([
+    ]],[[
+      /* O_NONBLOCK source test */
+      int socket;
+      int flags = fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+    ]])
+  ],[
+    dnl the O_NONBLOCK test was fine
+    nonblock="O_NONBLOCK"
+    AC_DEFINE(HAVE_O_NONBLOCK, 1,
+      [use O_NONBLOCK for non-blocking sockets])
+  ])
+  #
+  if test "$nonblock" = "unknown"; then
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
 /* headers for FIONBIO test */
 #include <unistd.h>
 #include <stropts.h>
-],[
-/* FIONBIO source test (old-style unix) */
- int socket;
- int flags = ioctl(socket, FIONBIO, &flags);
-],[
-dnl FIONBIO test was good
-nonblock="FIONBIO"
-AC_DEFINE(HAVE_FIONBIO, 1, [use FIONBIO for non-blocking sockets])
-],[
-dnl FIONBIO test was also bad
-dnl the code was bad, try a different program now, test 3
-
-  AC_TRY_COMPILE([
+      ]],[[
+        /* FIONBIO source test (old-style unix) */
+        int socket;
+        int flags = ioctl(socket, FIONBIO, &flags);
+      ]])
+    ],[
+      dnl FIONBIO test was good
+      nonblock="FIONBIO"
+      AC_DEFINE(HAVE_FIONBIO, 1,
+        [use FIONBIO for non-blocking sockets])
+    ])
+  fi
+  #
+  if test "$nonblock" = "unknown"; then
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
 /* headers for ioctlsocket test (Windows) */
 #undef inline
 #ifdef HAVE_WINDOWS_H
@@ -1133,65 +1191,63 @@ dnl the code was bad, try a different program now, test 3
 #endif
 #endif
 #endif
-],[
-/* ioctlsocket source code */
- SOCKET sd;
- unsigned long flags = 0;
- sd = socket(0, 0, 0);
- ioctlsocket(sd, FIONBIO, &flags);
-],[
-dnl ioctlsocket test was good
-nonblock="ioctlsocket"
-AC_DEFINE(HAVE_IOCTLSOCKET, 1, [use ioctlsocket() for non-blocking sockets])
-],[
-dnl ioctlsocket didnt compile!, go to test 4
-
-  AC_TRY_LINK([
+      ]],[[
+        /* ioctlsocket source code (Windows) */
+        SOCKET sd;
+        unsigned long flags = 0;
+        sd = socket(0, 0, 0);
+        ioctlsocket(sd, FIONBIO, &flags);
+      ]])
+    ],[
+      dnl ioctlsocket test was good
+      nonblock="ioctlsocket"
+      AC_DEFINE(HAVE_IOCTLSOCKET, 1,
+        [use ioctlsocket() for non-blocking sockets])
+    ])
+  fi
+  #
+  if test "$nonblock" = "unknown"; then
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([[
 /* headers for IoctlSocket test (Amiga?) */
 #include <sys/ioctl.h>
-],[
-/* IoctlSocket source code */
- int socket;
- int flags = IoctlSocket(socket, FIONBIO, (long)1);
-],[
-dnl ioctlsocket test was good
-nonblock="IoctlSocket"
-AC_DEFINE(HAVE_IOCTLSOCKET_CASE, 1, [use Ioctlsocket() for non-blocking sockets])
-],[
-dnl Ioctlsocket didnt compile, do test 5!
-  AC_TRY_COMPILE([
+      ]],[[
+        /* IoctlSocket source code (Amiga?) */
+        int socket;
+        int flags = IoctlSocket(socket, FIONBIO, (long)1);
+      ]])
+    ],[
+      dnl Ioctlsocket test was good
+      nonblock="IoctlSocket"
+      AC_DEFINE(HAVE_IOCTLSOCKET_CASE, 1,
+        [use Ioctlsocket() for non-blocking sockets])
+    ])
+  fi
+  #
+  if test "$nonblock" = "unknown"; then
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM([[
 /* headers for SO_NONBLOCK test (BeOS) */
 #include <socket.h>
-],[
-/* SO_NONBLOCK source code */
- long b = 1;
- int socket;
- int flags = setsockopt(socket, SOL_SOCKET, SO_NONBLOCK, &b, sizeof(b));
-],[
-dnl the SO_NONBLOCK test was good
-nonblock="SO_NONBLOCK"
-AC_DEFINE(HAVE_SO_NONBLOCK, 1, [use SO_NONBLOCK for non-blocking sockets])
-],[
-dnl test 5 didnt compile!
-nonblock="nada"
-AC_DEFINE(HAVE_DISABLED_NONBLOCKING, 1, [disabled non-blocking sockets])
-])
-dnl end of fifth test
-
-])
-dnl end of forth test
-
-])
-dnl end of third test
-
-])
-dnl end of second test
-
-])
-dnl end of non-blocking try-compile test
+      ]],[[
+        /* SO_NONBLOCK source code (BeOS) */
+        long b = 1;
+        int socket;
+        int flags = setsockopt(socket, SOL_SOCKET, SO_NONBLOCK, &b, sizeof(b));
+      ]])
+    ],[
+      dnl the SO_NONBLOCK test was good
+      nonblock="SO_NONBLOCK"
+      AC_DEFINE(HAVE_SO_NONBLOCK, 1,
+        [use SO_NONBLOCK for non-blocking sockets])
+    ])
+  fi
+  #
   AC_MSG_RESULT($nonblock)
-
-  if test "$nonblock" = "nada"; then
+  #
+  if test "$nonblock" = "unknown"; then
+    AC_DEFINE(HAVE_DISABLED_NONBLOCKING, 1,
+      [disabled non-blocking sockets])
     AC_MSG_WARN([non-block sockets disabled])
   fi
 ])
@@ -1209,7 +1265,8 @@ AC_DEFUN([TYPE_IN_ADDR_T],
       [
          curl_cv_in_addr_t_equiv=
          for t in "unsigned long" int size_t unsigned long; do
-            AC_TRY_COMPILE([
+            AC_LINK_IFELSE([
+              AC_LANG_PROGRAM([[
 #undef inline
 #ifdef HAVE_WINDOWS_H
 #ifndef WIN32_LEAN_AND_MEAN
@@ -1237,11 +1294,12 @@ AC_DEFUN([TYPE_IN_ADDR_T],
 #include <arpa/inet.h>
 #endif
 #endif
+              ]],[[
+                $t data = inet_addr ("1.2.3.4");
+              ]])
             ],[
-               $t data = inet_addr ("1.2.3.4");
-            ],[
-               curl_cv_in_addr_t_equiv="$t"
-               break
+              curl_cv_in_addr_t_equiv="$t"
+              break
             ])
          done
 
@@ -1283,6 +1341,123 @@ AC_DEFUN([TYPE_IN_ADDR_T],
   ]) dnl AC_CHECK_TYPE
 ]) dnl AC_DEFUN
 
+dnl CURL_CHECK_FUNC_CLOCK_GETTIME_MONOTONIC
+dnl -------------------------------------------------
+dnl Check if monotonic clock_gettime is available.
+
+AC_DEFUN([CURL_CHECK_FUNC_CLOCK_GETTIME_MONOTONIC], [
+  AC_REQUIRE([AC_HEADER_TIME])dnl
+  AC_CHECK_HEADERS(sys/types.h sys/time.h time.h)
+  AC_MSG_CHECKING([for monotonic clock_gettime])
+  AC_COMPILE_IFELSE([
+    AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#ifdef TIME_WITH_SYS_TIME
+#include <time.h>
+#endif
+#else
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+#endif
+    ]],[[
+      struct timespec ts;
+      (void)clock_gettime(CLOCK_MONOTONIC, &ts);
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    ac_cv_func_clock_gettime="yes"
+  ],[
+    AC_MSG_RESULT([no])
+    ac_cv_func_clock_gettime="no"
+  ])
+  dnl Definition of HAVE_CLOCK_GETTIME_MONOTONIC is intentionally
+  dnl postponed until library linking checks for clock_gettime pass.
+]) dnl AC_DEFUN
+
+dnl CURL_CHECK_LIBS_CLOCK_GETTIME_MONOTONIC
+dnl -------------------------------------------------
+dnl If monotonic clock_gettime is available then,
+dnl check and prepended to LIBS any needed libraries.
+
+AC_DEFUN([CURL_CHECK_LIBS_CLOCK_GETTIME_MONOTONIC], [
+  AC_REQUIRE([CURL_CHECK_FUNC_CLOCK_GETTIME_MONOTONIC])dnl
+  #
+  if test "$ac_cv_func_clock_gettime" = "yes"; then
+    #
+    AC_MSG_CHECKING([for clock_gettime in libraries])
+    #
+    curl_cv_save_LIBS="$LIBS"
+    curl_cv_gclk_LIBS="unknown"
+    #
+    for x_xlibs in '' '-lrt' '-lposix4' ; do
+      if test -z "$x_xlibs"; then
+        LIBS="$curl_cv_save_LIBS"
+      else
+        LIBS="$x_xlibs $curl_cv_save_LIBS"
+      fi
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#ifdef TIME_WITH_SYS_TIME
+#include <time.h>
+#endif
+#else
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+#endif
+        ]],[[
+          struct timespec ts;
+          (void)clock_gettime(CLOCK_MONOTONIC, &ts);
+        ]])
+      ],[
+        curl_cv_gclk_LIBS="$x_xlibs"
+        break
+      ])
+    done
+    #
+    LIBS="$curl_cv_save_LIBS"
+    #
+    case X-"$curl_cv_gclk_LIBS" in
+      X-unknown)
+        AC_MSG_RESULT([cannot find clock_gettime])
+        AC_MSG_WARN([HAVE_CLOCK_GETTIME_MONOTONIC will not be defined])
+        ac_cv_func_clock_gettime="no"
+        ;;
+      X-)
+        AC_MSG_RESULT([no additional lib required])
+        ac_cv_func_clock_gettime="yes"
+        ;;
+      *)
+        if test -z "$curl_cv_save_LIBS"; then
+          LIBS="$curl_cv_gclk_LIBS"
+        else
+          LIBS="$curl_cv_gclk_LIBS $curl_cv_save_LIBS"
+        fi
+        AC_MSG_RESULT([$curl_cv_gclk_LIBS])
+        ac_cv_func_clock_gettime="yes"
+        ;;
+    esac
+    #
+    case "$ac_cv_func_clock_gettime" in
+      yes)
+        AC_DEFINE_UNQUOTED(HAVE_CLOCK_GETTIME_MONOTONIC, 1,
+          [Define to 1 if you have the clock_gettime function and monotonic timer.])
+        ;;
+    esac
+    #
+  fi
+  #
+]) dnl AC_DEFUN
 
 dnl **********************************************************************
 dnl CURL_DETECT_ICC ([ACTION-IF-YES])
@@ -1484,50 +1659,74 @@ AC_DEFUN([CARES_CHECK_CONSTANT], [
 ])
 
 
-dnl This macro determines how many parameters getservbyport_r takes
+dnl CARES_CHECK_GETSERVBYPORT_R
+dnl -------------------------------------------------
+dnl Test if the getservbyport_r function is available,
+dnl and find out how many parameters it takes.
+
 AC_DEFUN([CARES_CHECK_GETSERVBYPORT_R], [
   AC_MSG_CHECKING([how many arguments getservbyport_r takes])
-  AC_TRY_LINK(
-    [#include <netdb.h>],
-    [
+  ac_func_getservbyport_r="unknown"
+
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+#include <netdb.h>
+    ]],[[
       int p1, p5;
       char *p2, p4[4096];
       struct servent *p3, *p6;
       getservbyport_r(p1, p2, p3, p4, p5, &p6);
-    ], ac_func_getservbyport_r=6,
-    [AC_TRY_LINK(
-      [#include <netdb.h>],
-      [
+    ]])
+  ],[
+    ac_func_getservbyport_r="6"
+  ])
+
+  if test "$ac_func_getservbyport_r" = "unknown"; then
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([[
+#include <netdb.h>
+      ]],[[
         int p1, p5;
         char *p2, p4[4096];
         struct servent *p3;
         getservbyport_r(p1, p2, p3, p4, p5);
-      ], ac_func_getservbyport_r=5,
-      [AC_TRY_LINK(
-        [#include <netdb.h>],
-        [
-          int p1;
-          char *p2;
-          struct servent *p3;
-          struct servent_data p4;
-          getservbyport_r(p1, p2, p3, &p4);
-        ], ac_func_getservbyport_r=4, ac_func_getservbyport_r=0
-      )]
-    )]
-  )
-if test $ac_func_getservbyport_r != "0" ; then
-  AC_MSG_RESULT($ac_func_getservbyport_r)
-  AC_DEFINE(HAVE_GETSERVBYPORT_R, 1, [Specifies whether getservbyport_r is present])
-  AC_DEFINE_UNQUOTED(GETSERVBYPORT_R_ARGS, $ac_func_getservbyport_r, [Specifies the number of arguments to 
-getservbyport_r])
-  if test $ac_func_getservbyport_r = "4" ; then
-   AC_DEFINE(GETSERVBYPORT_R_BUFSIZE, sizeof(struct servent_data), [Specifies the size of the buffer to pass to 
-getservbyport_r])
-  else
-   AC_DEFINE(GETSERVBYPORT_R_BUFSIZE, 4096, [Specifies the size of the buffer to pass to getservbyport_r])
+      ]])
+    ],[
+      ac_func_getservbyport_r="5"
+    ])
   fi
-else
-  AC_MSG_RESULT([not found])
-fi
+
+  if test "$ac_func_getservbyport_r" = "unknown"; then
+    AC_LINK_IFELSE([
+      AC_LANG_PROGRAM([[
+#include <netdb.h>
+      ]],[[
+        int p1;
+        char *p2;
+        struct servent *p3;
+        struct servent_data p4;
+        getservbyport_r(p1, p2, p3, &p4);
+      ]])
+    ],[
+      ac_func_getservbyport_r="4"
+    ])
+  fi
+
+  if test "$ac_func_getservbyport_r" = "unknown"; then
+    AC_MSG_RESULT([not found])
+  else
+    AC_MSG_RESULT($ac_func_getservbyport_r)
+    AC_DEFINE(HAVE_GETSERVBYPORT_R, 1,
+      [Specifies whether getservbyport_r is present])
+    AC_DEFINE_UNQUOTED(GETSERVBYPORT_R_ARGS, $ac_func_getservbyport_r,
+      [Specifies the number of arguments to getservbyport_r])
+    if test "$ac_func_getservbyport_r" = "4" ; then
+      AC_DEFINE(GETSERVBYPORT_R_BUFSIZE, sizeof(struct servent_data),
+        [Specifies the size of the buffer to pass to getservbyport_r])
+    else
+      AC_DEFINE(GETSERVBYPORT_R_BUFSIZE, 4096,
+        [Specifies the size of the buffer to pass to getservbyport_r])
+    fi
+  fi
 ])
 

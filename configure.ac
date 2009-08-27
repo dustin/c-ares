@@ -1,11 +1,9 @@
-
-dnl Process this file with autoconf to produce a configure script.
+AC_INIT([c-ares], [1.5.2])
 AC_PREREQ(2.57)
-AC_INIT(ares_init.c)
 AC_CONFIG_SRCDIR([ares_ipv6.h])
-AM_CONFIG_HEADER(config.h)
+AM_CONFIG_HEADER([config.h])
 AM_MAINTAINER_MODE
-AM_INIT_AUTOMAKE(c-ares, CVS)
+AM_INIT_AUTOMAKE
 
 dnl
 dnl Detect the canonical host and target build environment
@@ -17,12 +15,13 @@ AC_DEFINE_UNQUOTED(OS, "${host}", [cpu-machine-OS])
 
 AC_AIX
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_INSTALL
 
 case $host_os in
-solaris*)
-	AC_DEFINE(ETC_INET, 1, [if a /etc/inet dir is being used])
-	;;
+  solaris*)
+    AC_DEFINE(ETC_INET, 1, [if a /etc/inet dir is being used])
+    ;;
 esac
 
 dnl support building of Windows DLLs
@@ -45,6 +44,8 @@ AC_HELP_STRING([--disable-debug],[Disable debug options]),
 
     dnl when doing the debug stuff, use static library only
     AC_DISABLE_SHARED
+
+    debugbuild="yes"
 
     dnl the entire --enable-debug is a hack that lives and runs on top of
     dnl libcurl stuff so this BUILDING_LIBCURL is not THAT much uglier
@@ -70,16 +71,21 @@ AC_HELP_STRING([--disable-debug],[Disable debug options]),
   esac ],
        AC_MSG_RESULT(no)
 )
+AM_CONDITIONAL(DEBUGBUILD, test x$debugbuild = xyes)
 
 dnl skip libtool C++ and Fortran compiler checks
 m4_ifdef([AC_PROG_CXX], [m4_undefine([AC_PROG_CXX])])
 m4_defun([AC_PROG_CXX],[])
+m4_ifdef([AC_PROG_CXXCPP], [m4_undefine([AC_PROG_CXXCPP])])
+m4_defun([AC_PROG_CXXCPP],[true])
 m4_ifdef([AC_PROG_F77], [m4_undefine([AC_PROG_F77])])
 m4_defun([AC_PROG_F77],[])
 
 dnl skip libtool C++ and Fortran linker checks
 m4_ifdef([AC_LIBTOOL_CXX], [m4_undefine([AC_LIBTOOL_CXX])])
 m4_defun([AC_LIBTOOL_CXX],[])
+m4_ifdef([AC_LIBTOOL_CXXCPP], [m4_undefine([AC_LIBTOOL_CXXCPP])])
+m4_defun([AC_LIBTOOL_CXXCPP],[true])
 m4_ifdef([AC_LIBTOOL_F77], [m4_undefine([AC_LIBTOOL_F77])])
 m4_defun([AC_LIBTOOL_F77],[])
 
@@ -100,7 +106,7 @@ AC_PROG_LIBTOOL
 
 AC_MSG_CHECKING([if we need -no-undefined])
 case $host in
-  *-*-cygwin | *-*-mingw* | *-*-pw32*)
+  *-*-cygwin* | *-*-mingw* | *-*-pw32* | *-*-cegcc*)
     need_no_undefined=yes
     ;;
   *)
@@ -116,6 +122,28 @@ dnl (convert warning 147 into an error) so that it properly can detect the
 dnl gethostbyname_r() version
 dnl **********************************************************************
 CURL_DETECT_ICC([CFLAGS="$CFLAGS -we 147"])
+
+dnl **********************************************************************
+dnl Make sure that our checks for headers windows.h winsock.h winsock2.h 
+dnl and ws2tcpip.h take precedence over any other further checks which 
+dnl could be done later using AC_CHECK_HEADER or AC_CHECK_HEADERS for
+dnl this specific header files. And do them before its results are used.
+dnl **********************************************************************
+
+CURL_CHECK_HEADER_WINDOWS
+CURL_CHECK_NATIVE_WINDOWS
+case X-"$ac_cv_native_windows" in
+  X-yes)
+    CURL_CHECK_HEADER_WINSOCK
+    CURL_CHECK_HEADER_WINSOCK2
+    CURL_CHECK_HEADER_WS2TCPIP
+    ;;
+  *)
+    ac_cv_header_winsock_h="no"
+    ac_cv_header_winsock2_h="no"
+    ac_cv_header_ws2tcpip_h="no"
+    ;;
+esac
 
 dnl **********************************************************************
 dnl platform/compiler/architecture specific checks/flags
@@ -184,49 +212,107 @@ then
   AC_MSG_CHECKING([for gethostbyname with both nsl and socket libs])
   my_ac_save_LIBS=$LIBS
   LIBS="-lnsl -lsocket $LIBS"
-  AC_TRY_LINK( ,
-             [gethostbyname();],
-             [ dnl found it!
-             HAVE_GETHOSTBYNAME="1"
-             AC_MSG_RESULT([yes])],
-             [ dnl failed!
-             AC_MSG_RESULT([no])
-             dnl restore LIBS
-             LIBS=$my_ac_save_LIBS]
-             )
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+    ]],[[
+      gethostbyname();
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    HAVE_GETHOSTBYNAME="1"
+  ],[
+    AC_MSG_RESULT([no])
+    LIBS=$my_ac_save_LIBS
+  ])
 fi
 
 if test "$HAVE_GETHOSTBYNAME" != "1"
 then
-  dnl This is for Msys/Mingw
-  AC_MSG_CHECKING([for gethostbyname in ws2_32])
-  my_ac_save_LIBS=$LIBS
-  LIBS="-lws2_32 $LIBS"
-  AC_TRY_LINK([#include <winsock2.h>],
-               [gethostbyname("www.dummysite.com");],
-               [ dnl worked!
-               ws2="yes"
-               AC_MSG_RESULT([yes])
-               HAVE_GETHOSTBYNAME="1"],
-               [ dnl failed, restore LIBS
-               LIBS=$my_ac_save_LIBS
-               AC_MSG_RESULT(no)]
-             )
+  dnl This is for winsock systems
+  if test "$ac_cv_header_windows_h" = "yes"; then
+    if test "$ac_cv_header_winsock_h" = "yes"; then
+      case $host in
+        *-*-mingw32ce*)
+          winsock_LIB="-lwinsock"
+          ;;
+        *)
+          winsock_LIB="-lwsock32"
+          ;;
+      esac
+    fi
+    if test "$ac_cv_header_winsock2_h" = "yes"; then
+      winsock_LIB="-lws2_32"
+    fi
+    if test ! -z "$winsock_LIB"; then
+      my_ac_save_LIBS=$LIBS
+      LIBS="$winsock_LIB $LIBS"
+      AC_MSG_CHECKING([for gethostbyname in $winsock_LIB])
+      AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+#ifdef HAVE_WINDOWS_H
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#ifdef HAVE_WINSOCK2_H
+#include <winsock2.h>
+#else
+#ifdef HAVE_WINSOCK_H
+#include <winsock.h>
+#endif
+#endif
+#endif
+        ]],[[
+          gethostbyname("www.dummysite.com");
+        ]])
+      ],[
+        AC_MSG_RESULT([yes])
+        HAVE_GETHOSTBYNAME="1"
+      ],[
+        AC_MSG_RESULT([no])
+        winsock_LIB=""
+        LIBS=$my_ac_save_LIBS
+      ])
+    fi
+  fi
+fi
+
+if test "$HAVE_GETHOSTBYNAME" != "1"
+then
+  dnl This is for Minix 3.1
+  AC_MSG_CHECKING([for gethostbyname for Minix 3])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+/* Older Minix versions may need <net/gen/netdb.h> here instead */
+#include <netdb.h>
+    ]],[[
+      gethostbyname("www.dummysite.com");
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    HAVE_GETHOSTBYNAME="1"
+  ],[
+    AC_MSG_RESULT([no])
+  ])
 fi
 
 if test "$HAVE_GETHOSTBYNAME" != "1"
 then
   dnl This is for eCos with a stubbed DNS implementation
   AC_MSG_CHECKING([for gethostbyname for eCos])
-  AC_TRY_LINK([
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
 #include <stdio.h>
-#include <netdb.h>],
-               [gethostbyname("www.dummysite.com");],
-               [ dnl worked!
-               AC_MSG_RESULT([yes])
-               HAVE_GETHOSTBYNAME="1"],
-               AC_MSG_RESULT(no)
-             )
+#include <netdb.h>
+    ]],[[
+      gethostbyname("www.dummysite.com");
+    ]])
+  ],[
+    AC_MSG_RESULT([yes])
+    HAVE_GETHOSTBYNAME="1"
+  ],[
+    AC_MSG_RESULT([no])
+  ])
 fi
 
 if test "$HAVE_GETHOSTBYNAME" != "1"
@@ -258,8 +344,11 @@ fi
 dnl socket lib?
 AC_CHECK_FUNC(connect, , [ AC_CHECK_LIB(socket, connect) ])
 
-dnl dl lib?
-AC_CHECK_FUNC(dlclose, , [ AC_CHECK_LIB(dl, dlopen) ])
+dnl **********************************************************************
+dnl In case that function clock_gettime with monotonic timer is available,
+dnl check for additional required libraries.
+dnl **********************************************************************
+CURL_CHECK_LIBS_CLOCK_GETTIME_MONOTONIC
 
 AC_MSG_CHECKING([whether to use libgcc])
 AC_ARG_ENABLE(libgcc,
@@ -342,6 +431,9 @@ if test "x$RECENTAIX" = "xyes"; then
          dnl the optimizer assumes that pointers can only point to
          dnl an object of the same type.
          CFLAGS="$CFLAGS -qnoansialias"
+         dnl Force AIX xlc to stop after the compilation phase, and not
+         dnl generate object code, when the source compiles with errors.
+         CFLAGS="$CFLAGS -qhalt=e"
        )
 fi
 
@@ -352,18 +444,6 @@ dnl **********************************************************************
 
 dnl Checks for header files.
 AC_HEADER_STDC
-
-dnl **********************************************************************
-dnl Make sure that our checks for headers windows.h winsock.h winsock2.h 
-dnl and ws2tcpip.h take precedence over any other further checks which 
-dnl could be done later using AC_CHECK_HEADER or AC_CHECK_HEADERS for
-dnl this specific header files. And do them before its results are used.
-dnl **********************************************************************
-
-CURL_CHECK_HEADER_WINDOWS
-CURL_CHECK_HEADER_WINSOCK
-CURL_CHECK_HEADER_WINSOCK2
-CURL_CHECK_HEADER_WS2TCPIP
 
 CURL_CHECK_HEADER_MALLOC
 
@@ -380,7 +460,9 @@ AC_CHECK_HEADERS(
        netinet/tcp.h \
        net/if.h \
        errno.h \
+       strings.h \
        stdbool.h \
+       time.h \
        arpa/nameser.h \
        arpa/nameser_compat.h \
        arpa/inet.h,
@@ -831,8 +913,15 @@ AC_HELP_STRING([--with-random=FILE],
                [read randomness from FILE (default=/dev/urandom)]),
     [ RANDOM_FILE="$withval" ],
     [
-        dnl Check for random device
-        AC_CHECK_FILE("/dev/urandom", [ RANDOM_FILE="/dev/urandom"] )
+        dnl Check for random device.  If we're cross compiling, we can't
+        dnl check, and it's better to assume it doesn't exist than it is
+        dnl to fail on AC_CHECK_FILE or later.
+        if test "$cross_compiling" = "no"; then
+          AC_CHECK_FILE("/dev/urandom", [ RANDOM_FILE="/dev/urandom"] )
+        else
+          AC_MSG_WARN([cannot check for /dev/urandom while cross compiling; assuming none])
+        fi
+        
     ]
 )
 if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
@@ -841,4 +930,5 @@ if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
         [a suitable file/device to read random data from])
 fi
 
-AC_OUTPUT(Makefile libcares.pc)
+AC_CONFIG_FILES([Makefile libcares.pc])
+AC_OUTPUT

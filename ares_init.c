@@ -1,6 +1,7 @@
-/* $Id: ares_init.c,v 1.68 2007-10-22 23:31:40 gknauf Exp $ */
+/* $Id: ares_init.c,v 1.72 2008-05-15 00:00:19 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
+ * Copyright (C) 2007-2008 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -107,6 +108,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   int i;
   int status = ARES_SUCCESS;
   struct server_state *server;
+  struct timeval now;
 
 #ifdef CURLDEBUG
   const char *env = getenv("CARES_MEMDEBUG");
@@ -123,6 +125,8 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
     *channelptr = NULL;
     return ARES_ENOMEM;
   }
+
+  now = ares__tvnow();
 
   /* Set everything to distinguished values so we know they haven't
    * been set yet.
@@ -146,7 +150,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   channel->sock_state_cb = NULL;
   channel->sock_state_cb_data = NULL;
 
-  channel->last_timeout_processed = (long)time(NULL);
+  channel->last_timeout_processed = (time_t)now.tv_sec;
 
   /* Initialize our lists of queries */
   ares__init_list_head(&(channel->all_queries));
@@ -254,13 +258,16 @@ int ares_save_options(ares_channel channel, struct ares_options *options,
   if (!ARES_CONFIG_CHECK(channel))
     return ARES_ENODATA;
 
-  (*optmask) = (ARES_OPT_FLAGS|ARES_OPT_TIMEOUT|ARES_OPT_TRIES|ARES_OPT_NDOTS|
+  (*optmask) = (ARES_OPT_FLAGS|ARES_OPT_TRIES|ARES_OPT_NDOTS|
                 ARES_OPT_UDP_PORT|ARES_OPT_TCP_PORT|ARES_OPT_SOCK_STATE_CB|
                 ARES_OPT_SERVERS|ARES_OPT_DOMAINS|ARES_OPT_LOOKUPS|
-                ARES_OPT_SORTLIST);
+                ARES_OPT_SORTLIST|ARES_OPT_TIMEOUTMS);
 
   /* Copy easy stuff */
   options->flags   = channel->flags;
+
+  /* We return full millisecond resolution but that's only because we don't
+     set the ARES_OPT_TIMEOUT anymore, only the new ARES_OPT_TIMEOUTMS */
   options->timeout = channel->timeout;
   options->tries   = channel->tries;
   options->ndots   = channel->ndots;
@@ -328,8 +335,10 @@ static int init_by_options(ares_channel channel,
   /* Easy stuff. */
   if ((optmask & ARES_OPT_FLAGS) && channel->flags == -1)
     channel->flags = options->flags;
-  if ((optmask & ARES_OPT_TIMEOUT) && channel->timeout == -1)
+  if ((optmask & ARES_OPT_TIMEOUTMS) && channel->timeout == -1)
     channel->timeout = options->timeout;
+  else if ((optmask & ARES_OPT_TIMEOUT) && channel->timeout == -1)
+    channel->timeout = options->timeout * 1000;
   if ((optmask & ARES_OPT_TRIES) && channel->tries == -1)
     channel->tries = options->tries;
   if ((optmask & ARES_OPT_NDOTS) && channel->ndots == -1)
@@ -1245,16 +1254,61 @@ static int set_options(ares_channel channel, const char *str)
 static char *try_config(char *s, const char *opt)
 {
   size_t len;
+  ssize_t i;
+  ssize_t j;
+  char *p;
 
-  len = strlen(opt);
-  if (strncmp(s, opt, len) != 0 || !ISSPACE(s[len]))
+  if (!s || !opt)
+    /* no line or no option */
     return NULL;
-  s += len;
-  while (ISSPACE(*s))
-    s++;
-  return s;
-}
 
+  /* trim line comment */
+  for (i = 0; s[i] && s[i] != '#'; ++i);
+  s[i] = '\0';
+
+  /* trim trailing whitespace */
+  for (j = i-1; j >= 0 && ISSPACE(s[j]); --j);
+  s[++j] = '\0';
+
+  /* skip leading whitespace */
+  for (i = 0; s[i] && ISSPACE(s[i]); ++i);
+  p = &s[i];
+
+  if (!*p)
+    /* empty line */
+    return NULL;
+
+  if ((len = strlen(opt)) == 0)
+    /* empty option */
+    return NULL;
+
+  if (strncmp(p, opt, len) != 0)
+    /* line and option do not match */
+    return NULL;
+
+  /* skip over given option name */
+  p += len;
+
+  if (!*p)
+    /* no option value */
+    return NULL;
+
+  if ((opt[len-1] != ':') && (opt[len-1] != '=') && !ISSPACE(*p))
+    /* whitespace between option name and value is mandatory
+       for given option names which do not end with ':' or '=' */
+    return NULL;
+
+  /* skip over whitespace */
+  while (*p && ISSPACE(*p))
+    p++;
+
+  if (!*p)
+    /* no option value */
+    return NULL;
+
+  /* return pointer to option value */
+  return p;
+}
 #endif
 
 static const char *try_option(const char *p, const char *q, const char *opt)
@@ -1333,13 +1387,9 @@ static void randomize_key(unsigned char* key,int key_data_len)
   }
 #else /* !WIN32 */
 #ifdef RANDOM_FILE
-  char buffer[256];
   FILE *f = fopen(RANDOM_FILE, "rb");
   if(f) {
-    size_t i;
-    size_t rc = fread(buffer, key_data_len, 1, f);
-    for(i=0; i<rc && counter < key_data_len; i++)
-      key[counter++]=buffer[i];
+    counter = fread(key, 1, key_data_len, f);
     fclose(f);
   }
 #endif

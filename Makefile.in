@@ -15,6 +15,8 @@
 @SET_MAKE@
 
 
+
+
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -37,6 +39,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+noinst_PROGRAMS = $(am__EXEEXT_1)
 DIST_COMMON = README $(am__configure_deps) $(libcares_la_HEADERS) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/Makefile.inc $(srcdir)/config.h.in \
@@ -61,7 +64,7 @@ am__vpath_adj = case $$p in \
   esac;
 am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(man3dir)" \
-	"$(DESTDIR)$(libcares_ladir)"
+	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(libcares_ladir)"
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libcares_la_LIBADD =
@@ -74,10 +77,23 @@ am__objects_1 = ares_fds.lo ares_getsock.lo ares_process.lo \
 	ares_version.lo ares_expand_name.lo ares_parse_a_reply.lo \
 	windows_port.lo ares_expand_string.lo ares_parse_ptr_reply.lo \
 	ares_parse_aaaa_reply.lo ares_getnameinfo.lo inet_net_pton.lo \
-	bitncmp.lo inet_ntop.lo ares_parse_ns_reply.lo ares_llist.lo
+	bitncmp.lo inet_ntop.lo ares_parse_ns_reply.lo ares_llist.lo \
+	ares__timeval.lo
 am__objects_2 =
 am_libcares_la_OBJECTS = $(am__objects_1) $(am__objects_2)
 libcares_la_OBJECTS = $(am_libcares_la_OBJECTS)
+@DEBUGBUILD_FALSE@am__EXEEXT_1 = ahost$(EXEEXT) adig$(EXEEXT) \
+@DEBUGBUILD_FALSE@	acountry$(EXEEXT)
+PROGRAMS = $(noinst_PROGRAMS)
+am_acountry_OBJECTS = acountry.$(OBJEXT) ares_getopt.$(OBJEXT)
+acountry_OBJECTS = $(am_acountry_OBJECTS)
+acountry_DEPENDENCIES = $(top_builddir)/$(lib_LTLIBRARIES)
+am_adig_OBJECTS = adig.$(OBJEXT) ares_getopt.$(OBJEXT)
+adig_OBJECTS = $(am_adig_OBJECTS)
+adig_DEPENDENCIES = $(top_builddir)/$(lib_LTLIBRARIES)
+am_ahost_OBJECTS = ahost.$(OBJEXT) ares_getopt.$(OBJEXT)
+ahost_OBJECTS = $(am_ahost_OBJECTS)
+ahost_DEPENDENCIES = $(top_builddir)/$(lib_LTLIBRARIES)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I.
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -89,11 +105,15 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(libcares_la_SOURCES)
-DIST_SOURCES = $(libcares_la_SOURCES)
+SOURCES = $(libcares_la_SOURCES) $(acountry_SOURCES) $(adig_SOURCES) \
+	$(ahost_SOURCES)
+DIST_SOURCES = $(libcares_la_SOURCES) $(acountry_SOURCES) \
+	$(adig_SOURCES) $(ahost_SOURCES)
 man3dir = $(mandir)/man3
 NROFF = nroff
 MANS = $(man_MANS)
+pkgconfigDATA_INSTALL = $(INSTALL_DATA)
+DATA = $(pkgconfig_DATA)
 libcares_laHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(libcares_la_HEADERS)
 ETAGS = etags
@@ -124,11 +144,13 @@ CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CXXCPP = @CXXCPP@
 CYGPATH_W = @CYGPATH_W@
+DEBUGBUILD_FALSE = @DEBUGBUILD_FALSE@
+DEBUGBUILD_TRUE = @DEBUGBUILD_TRUE@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
+DSYMUTIL = @DSYMUTIL@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
@@ -150,6 +172,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+NMEDIT = @NMEDIT@
 NO_UNDEFINED_FALSE = @NO_UNDEFINED_FALSE@
 NO_UNDEFINED_TRUE = @NO_UNDEFINED_TRUE@
 OBJDUMP = @OBJDUMP@
@@ -214,16 +237,20 @@ target_alias = @target_alias@
 AUTOMAKE_OPTIONS = foreign
 lib_LTLIBRARIES = libcares.la
 man_MANS = $(MANPAGES)
-MSVCFILES = vc/adig/adig.dep vc/adig/adig.dsp vc/vc.dsw vc/ahost/ahost.dep \
- vc/ahost/ahost.dsp vc/areslib/areslib.dep vc/areslib/areslib.dsp	   \
- vc/areslib/areslib.dsw
+MSVCFILES = vc/vc.dsw vc/acountry/acountry.dsp vc/adig/adig.dsp \
+ vc/ahost/ahost.dsp vc/areslib/areslib.dsp vc/areslib/areslib.dsw
 
+@DEBUGBUILD_FALSE@PROGS = ahost adig acountry
+@DEBUGBUILD_TRUE@PROGS = 
 
 # adig and ahost are just sample programs and thus not mentioned with the
 # regular sources and headers
-EXTRA_DIST = CHANGES README.cares Makefile.inc adig.c ahost.c $(man_MANS) \
- $(MSVCFILES) AUTHORS config-win32.h RELEASE-NOTES libcares.pc.in
+EXTRA_DIST = AUTHORS CHANGES README.cares Makefile.inc Makefile.dj	   \
+ Makefile.m32 Makefile.netware Makefile.vc6 $(man_MANS) $(MSVCFILES)	   \
+ config-win32.h RELEASE-NOTES libcares.pc.in buildconf get_ver.awk maketgz
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libcares.pc
 VER = -version-info 2:0:0
 # This flag accepts an argument of the form current[:revision[:age]]. So,
 # passing -version-info 3:12:1 sets current to 3, revision to 12, and age to
@@ -264,7 +291,7 @@ ares_timeout.c ares_destroy.c ares_mkquery.c ares_version.c		\
 ares_expand_name.c ares_parse_a_reply.c windows_port.c			\
 ares_expand_string.c ares_parse_ptr_reply.c ares_parse_aaaa_reply.c	\
 ares_getnameinfo.c inet_net_pton.c bitncmp.c inet_ntop.c		\
-ares_parse_ns_reply.c ares_llist.c
+ares_parse_ns_reply.c ares_llist.c ares__timeval.c
 
 HHEADERS = ares.h ares_private.h setup.h ares_dns.h ares_version.h          \
            nameser.h inet_net_pton.h inet_ntop.h ares_ipv6.h bitncmp.h      \
@@ -287,6 +314,12 @@ libcares_la_SOURCES = $(CSOURCES) $(HHEADERS)
 libcares_ladir = $(includedir)
 # what headers to install on 'make install':
 libcares_la_HEADERS = ares.h ares_version.h ares_dns.h
+ahost_SOURCES = ahost.c ares_getopt.c ares_getopt.h
+ahost_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
+adig_SOURCES = adig.c ares_getopt.c ares_getopt.h
+adig_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
+acountry_SOURCES = acountry.c ares_getopt.c ares_getopt.h
+acountry_LDADD = $(top_builddir)/$(lib_LTLIBRARIES)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -374,15 +407,35 @@ clean-libLTLIBRARIES:
 libcares.la: $(libcares_la_OBJECTS) $(libcares_la_DEPENDENCIES) 
 	$(LINK) -rpath $(libdir) $(libcares_la_LDFLAGS) $(libcares_la_OBJECTS) $(libcares_la_LIBADD) $(LIBS)
 
+clean-noinstPROGRAMS:
+	@list='$(noinst_PROGRAMS)'; for p in $$list; do \
+	  f=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
+	  echo " rm -f $$p $$f"; \
+	  rm -f $$p $$f ; \
+	done
+acountry$(EXEEXT): $(acountry_OBJECTS) $(acountry_DEPENDENCIES) 
+	@rm -f acountry$(EXEEXT)
+	$(LINK) $(acountry_LDFLAGS) $(acountry_OBJECTS) $(acountry_LDADD) $(LIBS)
+adig$(EXEEXT): $(adig_OBJECTS) $(adig_DEPENDENCIES) 
+	@rm -f adig$(EXEEXT)
+	$(LINK) $(adig_LDFLAGS) $(adig_OBJECTS) $(adig_LDADD) $(LIBS)
+ahost$(EXEEXT): $(ahost_OBJECTS) $(ahost_DEPENDENCIES) 
+	@rm -f ahost$(EXEEXT)
+	$(LINK) $(ahost_LDFLAGS) $(ahost_OBJECTS) $(ahost_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/acountry.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/adig.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ahost.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares__close_sockets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares__get_hostent.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares__read_line.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares__timeval.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_cancel.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_destroy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_expand_name.Plo@am__quote@
@@ -393,6 +446,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_gethostbyaddr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_gethostbyname.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_getnameinfo.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_getopt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_getsock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_init.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_llist.Plo@am__quote@
@@ -488,6 +542,23 @@ uninstall-man3:
 	  echo " rm -f '$(DESTDIR)$(man3dir)/$$inst'"; \
 	  rm -f "$(DESTDIR)$(man3dir)/$$inst"; \
 	done
+install-pkgconfigDATA: $(pkgconfig_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkgconfigdir)" || $(mkdir_p) "$(DESTDIR)$(pkgconfigdir)"
+	@list='$(pkgconfig_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(pkgconfigDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgconfigdir)/$$f'"; \
+	  $(pkgconfigDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgconfigdir)/$$f"; \
+	done
+
+uninstall-pkgconfigDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkgconfig_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(pkgconfigdir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(pkgconfigdir)/$$f"; \
+	done
 install-libcares_laHEADERS: $(libcares_la_HEADERS)
 	@$(NORMAL_INSTALL)
 	test -z "$(libcares_ladir)" || $(mkdir_p) "$(DESTDIR)$(libcares_ladir)"
@@ -557,7 +628,7 @@ distclean-tags:
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/. $(distdir)/vc $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
+	$(mkdir_p) $(distdir)/. $(distdir)/vc $(distdir)/vc/acountry $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -686,9 +757,10 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(MANS) $(HEADERS) config.h
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(MANS) $(DATA) $(HEADERS) \
+		config.h
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(man3dir)" "$(DESTDIR)$(libcares_ladir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(man3dir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(libcares_ladir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-am
@@ -718,7 +790,7 @@ maintainer-clean-generic:
 clean: clean-am
 
 clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	mostlyclean-am
+	clean-noinstPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
@@ -737,7 +809,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-libcares_laHEADERS install-man
+install-data-am: install-libcares_laHEADERS install-man \
+	install-pkgconfigDATA
 
 install-exec-am: install-libLTLIBRARIES
 
@@ -768,26 +841,28 @@ ps: ps-am
 ps-am:
 
 uninstall-am: uninstall-info-am uninstall-libLTLIBRARIES \
-	uninstall-libcares_laHEADERS uninstall-man
+	uninstall-libcares_laHEADERS uninstall-man \
+	uninstall-pkgconfigDATA
 
 uninstall-man: uninstall-man3
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-am clean \
-	clean-generic clean-libLTLIBRARIES clean-libtool ctags dist \
-	dist-all dist-bzip2 dist-gzip dist-hook dist-shar dist-tarZ \
-	dist-zip distcheck distclean distclean-compile \
-	distclean-generic distclean-hdr distclean-libtool \
-	distclean-tags distcleancheck distdir distuninstallcheck dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-exec install-exec-am \
-	install-info install-info-am install-libLTLIBRARIES \
-	install-libcares_laHEADERS install-man install-man3 \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags uninstall uninstall-am \
-	uninstall-info-am uninstall-libLTLIBRARIES \
-	uninstall-libcares_laHEADERS uninstall-man uninstall-man3
+	clean-generic clean-libLTLIBRARIES clean-libtool \
+	clean-noinstPROGRAMS ctags dist dist-all dist-bzip2 dist-gzip \
+	dist-hook dist-shar dist-tarZ dist-zip distcheck distclean \
+	distclean-compile distclean-generic distclean-hdr \
+	distclean-libtool distclean-tags distcleancheck distdir \
+	distuninstallcheck dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-exec \
+	install-exec-am install-info install-info-am \
+	install-libLTLIBRARIES install-libcares_laHEADERS install-man \
+	install-man3 install-pkgconfigDATA install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-info-am \
+	uninstall-libLTLIBRARIES uninstall-libcares_laHEADERS \
+	uninstall-man uninstall-man3 uninstall-pkgconfigDATA
 
 
 # Make files named *.dist replace the file without .dist extension

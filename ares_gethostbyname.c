@@ -1,4 +1,4 @@
-/* $Id: ares_gethostbyname.c,v 1.34 2007-11-15 09:16:48 sesse Exp $ */
+/* $Id: ares_gethostbyname.c,v 1.37 2008-05-08 22:11:38 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -36,6 +36,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
 
 #include "ares.h"
 #include "ares_private.h"
@@ -138,7 +141,11 @@ static void next_lookup(struct host_query *hquery, int status_code)
         case 'f':
           /* Host file lookup */
           status = file_lookup(hquery->name, hquery->family, &host);
-          if (status != ARES_ENOTFOUND)
+
+          /* this status check below previously checked for !ARES_ENOTFOUND,
+             but we should not assume that this single error code is the one
+             that can occur, as that is in fact no longer the case */
+          if (status == ARES_SUCCESS)
             {
               end_hquery(hquery, status, host);
               return;
@@ -155,7 +162,7 @@ static void host_callback(void *arg, int status, int timeouts,
 {
   struct host_query *hquery = (struct host_query *) arg;
   ares_channel channel = hquery->channel;
-  struct hostent *host;
+  struct hostent *host = NULL;
 
   hquery->timeouts += timeouts;
   if (status == ARES_SUCCESS)

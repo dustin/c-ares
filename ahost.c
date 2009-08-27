@@ -1,6 +1,6 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
- * $Id: ahost.c,v 1.21 2007-11-15 19:44:01 yangtse Exp $
+ * $Id: ahost.c,v 1.23 2008-05-26 13:52:25 yangtse Exp $
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -28,6 +28,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#endif
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
 #endif
 
 #include <stdio.h>
@@ -138,6 +141,8 @@ int main(int argc, char **argv)
 static void callback(void *arg, int status, int timeouts, struct hostent *host)
 {
   char **p;
+
+  (void)timeouts;
 
   if (status != ARES_SUCCESS)
     {

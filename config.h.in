@@ -51,6 +51,9 @@
 /* Define to 1 if bool is an available type. */
 #undef HAVE_BOOL_T
 
+/* Define to 1 if you have the clock_gettime function and monotonic timer. */
+#undef HAVE_CLOCK_GETTIME_MONOTONIC
+
 /* disabled non-blocking sockets */
 #undef HAVE_DISABLED_NONBLOCKING
 
@@ -104,9 +107,6 @@
 
 /* use Ioctlsocket() for non-blocking sockets */
 #undef HAVE_IOCTLSOCKET_CASE
-
-/* Define to 1 if you have the `dl' library (-ldl). */
-#undef HAVE_LIBDL
 
 /* Define to 1 if you have the `resolve' library (-lresolve). */
 #undef HAVE_LIBRESOLVE
@@ -237,8 +237,14 @@
 /* Define to 1 if you have the ws2tcpip.h header file. */
 #undef HAVE_WS2TCPIP_H
 
+/* Define to 1 if you are building a native Windows target. */
+#undef NATIVE_WINDOWS
+
 /* Define to 1 if you need the malloc.h header file even with stdlib.h */
 #undef NEED_MALLOC_H
+
+/* Define to 1 if your C compiler doesn't accept -c and -o together. */
+#undef NO_MINUS_C_MINUS_O
 
 /* cpu-machine-OS */
 #undef OS
@@ -355,7 +361,7 @@
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t
 
-/* type to use in place of socklen_t if not defined */
+/* Type to use in place of socklen_t when system does not provide it. */
 #undef socklen_t
 
 /* the signed version of size_t */

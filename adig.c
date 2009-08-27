@@ -1,6 +1,6 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
- * $Id: adig.c,v 1.25 2007-09-28 14:46:51 sesse Exp $
+ * $Id: adig.c,v 1.30 2008-05-08 22:14:17 bagder Exp $
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -31,6 +31,9 @@
 #include <unistd.h>
 #endif
 #include <netdb.h>
+#endif
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
 #endif
 
 #include <stdio.h>
@@ -110,6 +113,7 @@ static const struct nv types[] = {
   { "AXFR",     T_AXFR },
   { "MAILB",    T_MAILB },
   { "MAILA",    T_MAILA },
+  { "NAPTR",    T_NAPTR },
   { "ANY",      T_ANY }
 };
 static const int ntypes = sizeof(types) / sizeof(types[0]);
@@ -302,6 +306,8 @@ static void callback(void *arg, int status, int timeouts,
   int id, qr, opcode, aa, tc, rd, ra, rcode;
   unsigned int qdcount, ancount, nscount, arcount, i;
   const unsigned char *aptr;
+
+  (void) timeouts;
 
   /* Display the query name if given. */
   if (name)
@@ -602,6 +608,41 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       printf("\t%s.", name);
       ares_free_string(name);
       break;
+
+    case T_NAPTR:
+
+      printf("\t%d", DNS__16BIT(aptr)); /* order */
+      printf(" %d\n", DNS__16BIT(aptr + 2)); /* preference */
+
+      p = aptr + 4;
+      status = ares_expand_string(p, abuf, alen, (unsigned char **)&name, &len);
+      if (status != ARES_SUCCESS)
+        return NULL;
+      printf("\t\t\t\t\t\t%s\n", name);
+      ares_free_string(name);
+      p += len;
+
+      status = ares_expand_string(p, abuf, alen, (unsigned char **)&name, &len);
+      if (status != ARES_SUCCESS)
+        return NULL;
+      printf("\t\t\t\t\t\t%s\n", name);
+      ares_free_string(name);
+      p += len;
+
+      status = ares_expand_string(p, abuf, alen, (unsigned char **)&name, &len);
+      if (status != ARES_SUCCESS)
+        return NULL;
+      printf("\t\t\t\t\t\t%s\n", name);
+      ares_free_string(name);
+      p += len;
+
+      status = ares_expand_string(p, abuf, alen, (unsigned char **)&name, &len);
+      if (status != ARES_SUCCESS)
+        return NULL;
+      printf("\t\t\t\t\t\t%s", name);
+      ares_free_string(name);
+      break;
+
 
     default:
       printf("\t[Unknown RR; cannot parse]");

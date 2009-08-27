@@ -1,6 +1,7 @@
-/* $Id: ares.h,v 1.38 2007-11-15 19:44:01 yangtse Exp $ */
+/* $Id: ares.h,v 1.40 2008-05-13 20:48:48 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
+ * Copyright (C) 2007 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -112,6 +113,7 @@ extern "C" {
 #define ARES_OPT_SORTLIST       (1 << 10)
 #define ARES_OPT_SOCK_SNDBUF    (1 << 11)
 #define ARES_OPT_SOCK_RCVBUF    (1 << 12)
+#define ARES_OPT_TIMEOUTMS      (1 << 13)
 
 /* Nameinfo flag values */
 #define ARES_NI_NOFQDN                  (1 << 0)
@@ -179,7 +181,7 @@ struct apattern;
 
 struct ares_options {
   int flags;
-  int timeout;
+  int timeout; /* in seconds or milliseconds, depending on options */
   int tries;
   int ndots;
   unsigned short udp_port;
@@ -245,7 +247,7 @@ int ares_expand_name(const unsigned char *encoded, const unsigned char *abuf,
 int ares_expand_string(const unsigned char *encoded, const unsigned char *abuf,
                      int alen, unsigned char **s, long *enclen);
 
-#ifndef s6_addr
+#if !defined(HAVE_STRUCT_IN6_ADDR) && !defined(s6_addr)
 struct in6_addr {
   union {
     unsigned char _S6_u8[16];
