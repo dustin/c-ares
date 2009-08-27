@@ -40,8 +40,9 @@ host_triplet = @host@
 DIST_COMMON = README $(am__configure_deps) $(libcares_la_HEADERS) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/Makefile.inc $(srcdir)/config.h.in \
-	$(top_srcdir)/configure AUTHORS NEWS config.guess config.sub \
-	depcomp install-sh ltmain.sh missing mkinstalldirs
+	$(srcdir)/libcares.pc.in $(top_srcdir)/configure AUTHORS NEWS \
+	config.guess config.sub depcomp install-sh ltmain.sh missing \
+	mkinstalldirs
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -52,7 +53,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = libcares.pc
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -73,7 +74,7 @@ am__objects_1 = ares_fds.lo ares_getsock.lo ares_process.lo \
 	ares_version.lo ares_expand_name.lo ares_parse_a_reply.lo \
 	windows_port.lo ares_expand_string.lo ares_parse_ptr_reply.lo \
 	ares_parse_aaaa_reply.lo ares_getnameinfo.lo inet_net_pton.lo \
-	bitncmp.lo inet_ntop.lo ares_parse_ns_reply.lo
+	bitncmp.lo inet_ntop.lo ares_parse_ns_reply.lo ares_llist.lo
 am__objects_2 =
 am_libcares_la_OBJECTS = $(am__objects_1) $(am__objects_2)
 libcares_la_OBJECTS = $(am_libcares_la_OBJECTS)
@@ -162,6 +163,7 @@ PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANDOM_FILE = @RANDOM_FILE@
 RANLIB = @RANLIB@
+SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
@@ -220,9 +222,9 @@ MSVCFILES = vc/adig/adig.dep vc/adig/adig.dsp vc/vc.dsw vc/ahost/ahost.dep \
 # adig and ahost are just sample programs and thus not mentioned with the
 # regular sources and headers
 EXTRA_DIST = CHANGES README.cares Makefile.inc adig.c ahost.c $(man_MANS) \
- $(MSVCFILES) AUTHORS config-win32.h RELEASE-NOTES
+ $(MSVCFILES) AUTHORS config-win32.h RELEASE-NOTES libcares.pc.in
 
-VER = -version-info 1:0:0
+VER = -version-info 2:0:0
 # This flag accepts an argument of the form current[:revision[:age]]. So,
 # passing -version-info 3:12:1 sets current to 3, revision to 12, and age to
 # 1.
@@ -262,7 +264,7 @@ ares_timeout.c ares_destroy.c ares_mkquery.c ares_version.c		\
 ares_expand_name.c ares_parse_a_reply.c windows_port.c			\
 ares_expand_string.c ares_parse_ptr_reply.c ares_parse_aaaa_reply.c	\
 ares_getnameinfo.c inet_net_pton.c bitncmp.c inet_ntop.c		\
-ares_parse_ns_reply.c
+ares_parse_ns_reply.c ares_llist.c
 
 HHEADERS = ares.h ares_private.h setup.h ares_dns.h ares_version.h          \
            nameser.h inet_net_pton.h inet_ntop.h ares_ipv6.h bitncmp.h      \
@@ -340,6 +342,8 @@ $(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+libcares.pc: $(top_builddir)/config.status $(srcdir)/libcares.pc.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
 	test -z "$(libdir)" || $(mkdir_p) "$(DESTDIR)$(libdir)"
@@ -391,6 +395,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_getnameinfo.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_getsock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_init.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_llist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_mkquery.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_parse_a_reply.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ares_parse_aaaa_reply.Plo@am__quote@
@@ -552,7 +557,7 @@ distclean-tags:
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkdir_p) $(distdir)/vc $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
+	$(mkdir_p) $(distdir)/. $(distdir)/vc $(distdir)/vc/adig $(distdir)/vc/ahost $(distdir)/vc/areslib
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \

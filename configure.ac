@@ -118,6 +118,43 @@ dnl **********************************************************************
 CURL_DETECT_ICC([CFLAGS="$CFLAGS -we 147"])
 
 dnl **********************************************************************
+dnl platform/compiler/architecture specific checks/flags
+dnl **********************************************************************
+
+case $host in
+  #
+  x86_64*linux*)
+    #
+    dnl find out if icc is being used
+    if test "z$ICC" = "z"; then
+      CURL_DETECT_ICC
+    fi
+    #
+    if test "$ICC" = "yes"; then
+      dnl figure out icc version
+      AC_MSG_CHECKING([icc version])
+      iccver=`$CC -dumpversion`
+      iccnhi=`echo $iccver | cut -d . -f1`
+      iccnlo=`echo $iccver | cut -d . -f2`
+      iccnum=`(expr $iccnhi "*" 100 + $iccnlo) 2>/dev/null`
+      AC_MSG_RESULT($iccver)
+      #
+      if test "$iccnum" -ge "900" && test "$iccnum" -lt "1000"; then
+        dnl icc 9.X specific
+        CFLAGS="$CFLAGS -i-dynamic"
+      fi
+      #
+      if test "$iccnum" -ge "1000"; then
+        dnl icc 10.X or later
+        CFLAGS="$CFLAGS -shared-intel"
+      fi
+      #
+    fi
+    ;;
+  #
+esac
+
+dnl **********************************************************************
 dnl Checks for libraries.
 dnl **********************************************************************
 
@@ -337,8 +374,10 @@ AC_CHECK_HEADERS(
        sys/select.h \
        sys/socket.h \
        sys/ioctl.h \
+       sys/param.h \
        netdb.h \
        netinet/in.h \
+       netinet/tcp.h \
        net/if.h \
        errno.h \
        stdbool.h \
@@ -600,6 +639,7 @@ AC_CHECK_MEMBER(struct addrinfo.ai_flags,
 
 
 AC_CHECK_FUNCS( bitncmp \
+                gettimeofday \
                 if_indextoname,
 dnl if found
 [],
@@ -801,4 +841,4 @@ if test -n "$RANDOM_FILE" && test X"$RANDOM_FILE" != Xno ; then
         [a suitable file/device to read random data from])
 fi
 
-AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile libcares.pc)
