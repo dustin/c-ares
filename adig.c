@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: adig.c,v 1.1 1998/08/13 18:07:05 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -26,8 +26,10 @@ static const char rcsid[] = "$Id";
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <errno.h>
 #include <netdb.h>
 #include "ares.h"
+#include "ares_dns.h"
 
 #ifndef INADDR_NONE
 #define	INADDR_NONE 0xffffffff
@@ -35,16 +37,6 @@ static const char rcsid[] = "$Id";
 
 extern int optind;
 extern char *optarg;
-
-static void callback(void *arg, int status, unsigned char *abuf, int alen);
-static void usage(void);
-static const unsigned char *display_question(const unsigned char *aptr,
-					     const unsigned char *abuf,
-					     int alen);
-static const unsigned char *display_rr(const unsigned char *aptr,
-				       const unsigned char *abuf, int alen);
-static const char *type_name(int type);
-static const char *class_name(int class);
 
 struct nv {
   const char *name;
@@ -123,6 +115,16 @@ static const char *rcodes[] = {
   "(unknown)", "(unknown)", "(unknown)", "(unknown)", "NOCHANGE"
 };
 
+static void callback(void *arg, int status, unsigned char *abuf, int alen);
+static const unsigned char *display_question(const unsigned char *aptr,
+					     const unsigned char *abuf,
+					     int alen);
+static const unsigned char *display_rr(const unsigned char *aptr,
+				       const unsigned char *abuf, int alen);
+static const char *type_name(int type);
+static const char *class_name(int class);
+static void usage(void);
+
 int main(int argc, char **argv)
 {
   ares_channel channel;
@@ -137,7 +139,7 @@ int main(int argc, char **argv)
   options.flags = ARES_FLAG_NOCHECKRESP;
   options.servers = NULL;
   options.nservers = 0;
-  while ((c = getopt(argc, argv, "f:s:c:t:p:")) != -1)
+  while ((c = getopt(argc, argv, "f:s:c:t:T:U:")) != -1)
     {
       switch (c)
 	{
@@ -198,12 +200,20 @@ int main(int argc, char **argv)
 	  type = types[i].value;
 	  break;
 
-	case 'p':
-	  /* Set the port number. */
+	case 'T':
+	  /* Set the TCP port number. */
 	  if (!isdigit(*optarg))
 	    usage();
-	  options.port = atoi(optarg);
-	  optmask |= ARES_OPT_PORT;
+	  options.tcp_port = strtoul(optarg, NULL, 0);
+	  optmask |= ARES_OPT_TCP_PORT;
+	  break;
+
+	case 'U':
+	  /* Set the UDP port number. */
+	  if (!isdigit(*optarg))
+	    usage();
+	  options.udp_port = strtoul(optarg, NULL, 0);
+	  optmask |= ARES_OPT_UDP_PORT;
 	  break;
 	}
     }
@@ -230,11 +240,8 @@ int main(int argc, char **argv)
     ares_query(channel, *argv, class, type, callback, (char *) NULL);
   else
     {
-      while (*argv)
-	{
-	  ares_query(channel, *argv, class, type, callback, *argv);
-	  argv++;
-	}
+      for (; *argv; argv++)
+	ares_query(channel, *argv, class, type, callback, *argv);
     }
 
   /* Wait for all queries to complete. */
@@ -245,8 +252,13 @@ int main(int argc, char **argv)
       nfds = ares_fds(channel, &read_fds, &write_fds);
       if (nfds == 0)
 	break;
-      tvp = ares_timeout(channel, &tv);
+      tvp = ares_timeout(channel, NULL, &tv);
       count = select(nfds, &read_fds, &write_fds, NULL, tvp);
+      if (count < 0 && errno != EINVAL)
+	{
+	  perror("select");
+	  return 1;
+	}
       ares_process(channel, &read_fds, &write_fds);
     }
 
@@ -282,18 +294,18 @@ static void callback(void *arg, int status, unsigned char *abuf, int alen)
     return;
 
   /* Parse the answer header. */
-  id = (abuf[0] << 8) | abuf[1];
-  qr = (abuf[2] >> 7) & 0x1;
-  opcode = (abuf[2] >> 3) & 0xf;
-  aa = (abuf[2] >> 2) & 0x1;
-  tc = (abuf[2] >> 1) & 0x1;
-  rd = abuf[2] & 0x1;
-  ra = (abuf[3] >> 7) & 0x1;
-  rcode = abuf[3] & 0xf;
-  qdcount = (abuf[4] << 8) | abuf[5];
-  ancount = (abuf[6] << 8) | abuf[7];
-  nscount = (abuf[8] << 8) | abuf[9];
-  arcount = (abuf[10] << 8) | abuf[11];
+  id = DNS_HEADER_QID(abuf);
+  qr = DNS_HEADER_QR(abuf);
+  opcode = DNS_HEADER_OPCODE(abuf);
+  aa = DNS_HEADER_AA(abuf);
+  tc = DNS_HEADER_TC(abuf);
+  rd = DNS_HEADER_RD(abuf);
+  ra = DNS_HEADER_RA(abuf);
+  rcode = DNS_HEADER_RCODE(abuf);
+  qdcount = DNS_HEADER_QDCOUNT(abuf);
+  ancount = DNS_HEADER_ANCOUNT(abuf);
+  nscount = DNS_HEADER_NSCOUNT(abuf);
+  arcount = DNS_HEADER_ARCOUNT(abuf);
 
   /* Display the answer header. */
   printf("id: %d\n", id);
@@ -367,8 +379,8 @@ static const unsigned char *display_question(const unsigned char *aptr,
     }
 
   /* Parse the question type and class. */
-  type = (aptr[0] << 8) | aptr[1];
-  class = (aptr[2] << 8) | aptr[3];
+  type = DNS_QUESTION_TYPE(aptr);
+  class = DNS_QUESTION_CLASS(aptr);
   aptr += QFIXEDSZ;
 
   /* Display the question, in a format sort of similar to how we will
@@ -407,10 +419,10 @@ static const unsigned char *display_rr(const unsigned char *aptr,
 
   /* Parse the fixed part of the RR, and advance to the RR data
    * field. */
-  type = (aptr[0] << 8) | aptr[1];
-  class = (aptr[2] << 8) | aptr[3];
-  ttl = (aptr[4] << 24) | (aptr[5] << 16) | (aptr[6] >> 8) | aptr[7];
-  dlen = (aptr[8] << 8) | aptr[9];
+  type = DNS_RR_TYPE(aptr);
+  class = DNS_RR_CLASS(aptr);
+  ttl = DNS_RR_TTL(aptr);
+  dlen = DNS_RR_LEN(aptr);
   aptr += RRFIXEDSZ;
   if (aptr + dlen > abuf + alen)
     {

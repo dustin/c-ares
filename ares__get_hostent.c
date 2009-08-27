@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares__get_hostent.c,v 1.1 1998/08/13 18:06:26 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -142,25 +142,21 @@ int ares__get_hostent(FILE *fp, struct hostent **host)
 
   if (status == ARES_SUCCESS)
     {
-      /* Memory allocation failure; clean up.  Not pretty. */
+      /* Memory allocation failure; clean up. */
       if (hostent)
 	{
-	  if (hostent->h_name)
-	    free(hostent->h_name);
+	  free(hostent->h_name);
 	  if (hostent->h_aliases)
 	    {
 	      for (alias = hostent->h_aliases; *alias; alias++)
 		free(*alias);
-	      free(hostent->h_aliases);
 	    }
+	  free(hostent->h_aliases);
 	  if (hostent->h_addr_list)
-	    {
-	      if (hostent->h_addr_list[0])
-		free(hostent->h_addr_list[0]);
-	      free(hostent->h_addr_list);
-	    }
-	  free(hostent);
+	    free(hostent->h_addr_list[0]);
+	  free(hostent->h_addr_list);
 	}
+      free(hostent);
       return ARES_ENOMEM;
     }
 

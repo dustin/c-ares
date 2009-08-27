@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_search.c,v 1.1 1998/08/13 18:06:34 ghudson Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -144,19 +144,20 @@ static void search_callback(void *arg, int status, unsigned char *abuf,
       if (squery->next_domain < channel->ndomains)
 	{
 	  /* Try the next domain. */
-	  squery->next_domain++;
-	  squery->trying_as_is = 0;
 	  status = cat_domain(squery->name,
 			      channel->domains[squery->next_domain], &s);
 	  if (status != ARES_SUCCESS)
 	    end_squery(squery, status, NULL, 0);
 	  else
 	    {
+	      squery->trying_as_is = 0;
+	      squery->next_domain++;
 	      ares_query(channel, s, squery->class, squery->type,
 			 search_callback, squery);
+	      free(s);
 	    }
 	}
-      else if (!squery->trying_as_is)
+      else if (squery->status_as_is == -1)
 	{
 	  /* Try the name as-is at the end. */
 	  squery->trying_as_is = 1;

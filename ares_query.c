@@ -13,12 +13,13 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_query.c,v 1.1 1998/08/13 18:06:33 ghudson Exp $";
 
 #include <sys/types.h>
 #include <arpa/nameser.h>
 #include <stdlib.h>
 #include "ares.h"
+#include "ares_dns.h"
 #include "ares_private.h"
 
 struct qquery {
@@ -32,9 +33,10 @@ void ares_query(ares_channel channel, const char *name, int class,
 		int type, ares_callback callback, void *arg)
 {
   struct qquery *qquery;
-  char *qbuf;
+  unsigned char *qbuf;
   int qlen, rd, status;
 
+  /* Compose the query. */
   rd = !(channel->flags & ARES_FLAG_NORECURSE);
   status = ares_mkquery(name, class, type, channel->next_id, rd, &qbuf, &qlen);
   channel->next_id++;
@@ -44,6 +46,7 @@ void ares_query(ares_channel channel, const char *name, int class,
       return;
     }
 
+  /* Allocate and fill in the query structure. */
   qquery = malloc(sizeof(struct qquery));
   if (!qquery)
     {
@@ -51,10 +54,10 @@ void ares_query(ares_channel channel, const char *name, int class,
       callback(arg, ARES_ENOMEM, NULL, 0);
       return;
     }
-
   qquery->callback = callback;
   qquery->arg = arg;
 
+  /* Send it off.  qcallback will be called when we get an answer. */
   ares_send(channel, qbuf, qlen, qcallback, qquery);
   free(qbuf);
 }
@@ -69,8 +72,8 @@ static void qcallback(void *arg, int status, unsigned char *abuf, int alen)
   else
     {
       /* Pull the response code and answer count from the packet. */
-      rcode = abuf[3] & 0xf;
-      ancount = abuf[6] << 8 | abuf[7];
+      rcode = DNS_HEADER_RCODE(abuf);
+      ancount = DNS_HEADER_ANCOUNT(abuf);
 
       /* Convert errors. */
       switch (rcode)

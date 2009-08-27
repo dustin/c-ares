@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $Id: ares.h,v 1.1 1998/08/13 18:07:55 ghudson Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -58,17 +58,19 @@
 #define ARES_OPT_TIMEOUT	(1 << 1)
 #define ARES_OPT_TRIES		(1 << 2)
 #define ARES_OPT_NDOTS		(1 << 3)
-#define ARES_OPT_PORT		(1 << 4)
-#define ARES_OPT_SERVERS	(1 << 5)
-#define ARES_OPT_DOMAINS	(1 << 6)
-#define ARES_OPT_LOOKUPS	(1 << 7)
+#define ARES_OPT_UDP_PORT	(1 << 4)
+#define ARES_OPT_TCP_PORT	(1 << 5)
+#define ARES_OPT_SERVERS	(1 << 6)
+#define ARES_OPT_DOMAINS	(1 << 7)
+#define ARES_OPT_LOOKUPS	(1 << 8)
 
 struct ares_options {
   int flags;
   int timeout;
   int tries;
   int ndots;
-  unsigned short port;
+  unsigned short udp_port;
+  unsigned short tcp_port;
   struct in_addr *servers;
   int nservers;
   char **domains;
@@ -102,11 +104,12 @@ void ares_gethostbyaddr(ares_channel channel, const void *addr, int addrlen,
 			int family, ares_host_callback callback, void *arg);
 
 int ares_fds(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
-struct timeval *ares_timeout(ares_channel channel, struct timeval *tv);
+struct timeval *ares_timeout(ares_channel channel, struct timeval *maxtv,
+			     struct timeval *tv);
 void ares_process(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
 
 int ares_mkquery(const char *name, int class, int type, unsigned short id,
-		 int rd, char **buf, int *buflen);
+		 int rd, unsigned char **buf, int *buflen);
 int ares_expand_name(const unsigned char *encoded, const unsigned char *abuf,
 		     int alen, char **s, int *enclen);
 int ares_parse_a_reply(const unsigned char *abuf, int alen,

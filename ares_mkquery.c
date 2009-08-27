@@ -13,13 +13,14 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_mkquery.c,v 1.1 1998/08/13 18:06:31 ghudson Exp $";
 
 #include <sys/types.h>
 #include <arpa/nameser.h>
 #include <stdlib.h>
 #include <string.h>
 #include "ares.h"
+#include "ares_dns.h"
 
 /* Header format, from RFC 1035:
  *                                  1  1  1  1  1  1
@@ -70,10 +71,10 @@ static const char rcsid[] = "$Id";
  */
 
 int ares_mkquery(const char *name, int class, int type, unsigned short id,
-		 int rd, char **buf, int *buflen)
+		 int rd, unsigned char **buf, int *buflen)
 {
   int len;
-  char *q;
+  unsigned char *q;
   const char *p;
 
   /* Compute the length of the encoded name so we can check buflen.
@@ -97,17 +98,13 @@ int ares_mkquery(const char *name, int class, int type, unsigned short id,
   if (!*buf)
       return ARES_ENOMEM;
 
-  /* First two bytes are the ID. */
+  /* Set up the header. */
   q = *buf;
-  q[0] = (id >> 8) & 0xff;
-  q[1] = id & 0xff;
-
-  /* The second byte has the opcode and RD bit.  The remaining bytes are
-   * all 0 except for the second byte of QDCOUNT.
-   */
-  q[2] = (QUERY << 3) | ((rd) ? 1 : 0);
-  memset(q + 3, 0, 9);
-  q[5] = 1;
+  memset(q, 0, HFIXEDSZ);
+  DNS_HEADER_SET_QID(q, id);
+  DNS_HEADER_SET_OPCODE(q, QUERY);
+  DNS_HEADER_SET_RD(q, (rd) ? 1 : 0);
+  DNS_HEADER_SET_QDCOUNT(q, 1);
 
   /* A name of "." is a screw case for the loop below, so adjust it. */
   if (strcmp(name, ".") == 0)
@@ -150,10 +147,8 @@ int ares_mkquery(const char *name, int class, int type, unsigned short id,
   *q++ = 0;
 
   /* Finish off the question with the type and class. */
-  q[0] = (type >> 8) & 0xff;
-  q[1] = type & 0xff;
-  q[2] = (class >> 8) & 0xff;
-  q[3] = class & 0xff;
+  DNS_QUESTION_SET_TYPE(q, type);
+  DNS_QUESTION_SET_CLASS(q, class);
 
   return ARES_SUCCESS;
 }

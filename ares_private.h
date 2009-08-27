@@ -1,4 +1,4 @@
-/* $Id$ */
+/* $Id: ares_private.h,v 1.1 1998/08/13 18:07:56 ghudson Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -92,7 +92,8 @@ struct ares_channeldata {
   int timeout;
   int tries;
   int ndots;
-  int port;
+  int udp_port;
+  int tcp_port;
   char **domains;
   int ndomains;
   char *lookups;
@@ -108,8 +109,7 @@ struct ares_channeldata {
   struct query *queries;
 };
 
-void ares__current_server(ares_channel channel, struct query *query,
-			  time_t now);
+void ares__send_query(ares_channel channel, struct query *query, time_t now);
 void ares__close_sockets(struct server_state *server);
 int ares__get_hostent(FILE *fp, struct hostent **host);
 int ares__read_line(FILE *fp, char **buf, int *bufsize);

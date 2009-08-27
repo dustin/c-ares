@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_process.c,v 1.1 1998/08/13 18:06:32 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -26,6 +26,7 @@ static const char rcsid[] = "$Id";
 #include <time.h>
 #include <errno.h>
 #include "ares.h"
+#include "ares_dns.h"
 #include "ares_private.h"
 
 static void write_tcp_data(ares_channel channel, fd_set *write_fds,
@@ -52,9 +53,7 @@ void ares_process(ares_channel channel, fd_set *read_fds, fd_set *write_fds)
 {
   time_t now;
 
-  /* Get the current time. */
   time(&now);
-
   write_tcp_data(channel, write_fds, now);
   read_tcp_data(channel, read_fds, now);
   read_udp_packets(channel, read_fds, now);
@@ -73,6 +72,7 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
 
   for (i = 0; i < channel->nservers; i++)
     {
+      /* Make sure server has data to send and is selected in write_fds. */
       server = &channel->servers[i];
       if (!server->qhead || server->tcp_socket == -1
 	  || !FD_ISSET(server->tcp_socket, write_fds))
@@ -87,6 +87,7 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
       vec = malloc(n * sizeof(struct iovec));
       if (vec)
 	{
+	  /* Fill in the iovecs and send. */
 	  n = 0;
 	  for (sendreq = server->qhead; sendreq; sendreq = sendreq->next)
 	    {
@@ -101,6 +102,8 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
 	      handle_error(channel, i, now);
 	      continue;
 	    }
+
+	  /* Advance the send queue by as many bytes as we sent. */
 	  while (count)
 	    {
 	      sendreq = server->qhead;
@@ -130,6 +133,8 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
 	      handle_error(channel, i, now);
 	      continue;
 	    }
+
+	  /* Advance the send queue by as many bytes as we sent. */
 	  if (count == sendreq->len)
 	    {
 	      server->qhead = sendreq->next;
@@ -157,12 +162,16 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
 
   for (i = 0; i < channel->nservers; i++)
     {
+      /* Make sure the server has a socket and is selected in read_fds. */
       server = &channel->servers[i];
       if (server->tcp_socket == -1 || !FD_ISSET(server->tcp_socket, read_fds))
 	continue;
 
       if (server->tcp_lenbuf_pos != 2)
 	{
+	  /* We haven't yet read a length word, so read that (or
+	   * what's left to read of it).
+	   */
 	  count = read(server->tcp_socket,
 		       server->tcp_lenbuf + server->tcp_lenbuf_pos,
 		       2 - server->tcp_lenbuf_pos);
@@ -171,9 +180,13 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
 	      handle_error(channel, i, now);
 	      continue;
 	    }
+
 	  server->tcp_lenbuf_pos += count;
 	  if (server->tcp_lenbuf_pos == 2)
 	    {
+	      /* We finished reading the length word.  Decode the
+               * length and allocate a buffer for the data.
+	       */
 	      server->tcp_length = server->tcp_lenbuf[0] << 8
 		| server->tcp_lenbuf[1];
 	      server->tcp_buffer = malloc(server->tcp_length);
@@ -184,6 +197,7 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
 	}
       else
 	{
+	  /* Read data into the allocated buffer. */
 	  count = read(server->tcp_socket,
 		       server->tcp_buffer + server->tcp_buffer_pos,
 		       server->tcp_length - server->tcp_buffer_pos);
@@ -192,9 +206,13 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
 	      handle_error(channel, i, now);
 	      continue;
 	    }
+
 	  server->tcp_buffer_pos += count;
 	  if (server->tcp_buffer_pos == server->tcp_length)
 	    {
+	      /* We finished reading this answer; process it and
+               * prepare to read another length word.
+	       */
 	      process_answer(channel, server->tcp_buffer, server->tcp_length,
 			     i, 1, now);
 	      free(server->tcp_buffer);
@@ -215,6 +233,7 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
 
   for (i = 0; i < channel->nservers; i++)
     {
+      /* Make sure the server has a socket and is selected in read_fds. */
       server = &channel->servers[i];
       if (server->udp_socket == -1 || !FD_ISSET(server->udp_socket, read_fds))
 	continue;
@@ -255,9 +274,9 @@ static void process_answer(ares_channel channel, unsigned char *abuf,
     return;
 
   /* Grab the query ID, truncate bit, and response code from the packet. */
-  id = abuf[0] << 8 | abuf[1];
-  tc = abuf[2] >> 1 & 0x1;
-  rcode = abuf[3] & 0xf;
+  id = DNS_HEADER_QID(abuf);
+  tc = DNS_HEADER_TC(abuf);
+  rcode = DNS_HEADER_RCODE(abuf);
 
   /* Find the query corresponding to this packet. */
   for (query = channel->queries; query; query = query->next)
@@ -277,7 +296,7 @@ static void process_answer(ares_channel channel, unsigned char *abuf,
       if (!query->using_tcp)
 	{
 	  query->using_tcp = 1;
-	  ares__current_server(channel, query, now);
+	  ares__send_query(channel, query, now);
 	}
       return;
     }
@@ -335,7 +354,7 @@ static void next_server(ares_channel channel, struct query *query, time_t now)
 	{
 	  if (!query->skip_server[query->server])
 	    {
-	      ares__current_server(channel, query, now);
+	      ares__send_query(channel, query, now);
 	      return;
 	    }
 	}
@@ -348,8 +367,7 @@ static void next_server(ares_channel channel, struct query *query, time_t now)
   end_query(channel, query, query->error_status, NULL, 0);
 }
 
-void ares__current_server(ares_channel channel, struct query *query,
-			  time_t now)
+void ares__send_query(ares_channel channel, struct query *query, time_t now)
 {
   struct send_request *sendreq;
   struct server_state *server;
@@ -431,7 +449,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
   sin.sin_addr = server->addr;
-  sin.sin_port = channel->port;
+  sin.sin_port = channel->tcp_port;
   if (connect(s, (struct sockaddr *) &sin, sizeof(sin)) == -1
       && errno != EINPROGRESS)
     {
@@ -457,7 +475,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
   sin.sin_addr = server->addr;
-  sin.sin_port = channel->port;
+  sin.sin_port = channel->udp_port;
   if (connect(s, (struct sockaddr *) &sin, sizeof(sin)) == -1)
     {
       close(s);
@@ -485,8 +503,8 @@ static int same_questions(const unsigned char *qbuf, int qlen,
     return 0;
 
   /* Extract qdcount from the request and reply buffers and compare them. */
-  q.qdcount = qbuf[4] << 8 || qbuf[5];
-  a.qdcount = abuf[4] << 8 || abuf[5];
+  q.qdcount = DNS_HEADER_QDCOUNT(qbuf);
+  a.qdcount = DNS_HEADER_QDCOUNT(abuf);
   if (q.qdcount != a.qdcount)
     return 0;
 
@@ -504,8 +522,8 @@ static int same_questions(const unsigned char *qbuf, int qlen,
 	  free(q.name);
 	  return 0;
 	}
-      q.type = q.p[0] << 8 | q.p[1];
-      q.class = q.p[2] << 8 | q.p[3];
+      q.type = DNS_QUESTION_TYPE(q.p);
+      q.class = DNS_QUESTION_CLASS(q.p);
       q.p += QFIXEDSZ;
 
       /* Search for this question in the answer. */
@@ -526,8 +544,8 @@ static int same_questions(const unsigned char *qbuf, int qlen,
 	      free(a.name);
 	      return 0;
 	    }
-	  a.type = a.p[0] << 8 | a.p[1];
-	  a.class = a.p[2] << 8 | a.p[3];
+	  a.type = DNS_QUESTION_TYPE(a.p);
+	  a.class = DNS_QUESTION_CLASS(a.p);
 	  a.p += QFIXEDSZ;
 
 	  /* Compare the decoded questions. */

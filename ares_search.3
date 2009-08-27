@@ -1,4 +1,4 @@
-.\" $Id$
+.\" $Id: ares_search.3,v 1.1 1998/08/13 18:07:35 ghudson Exp $
 .\"
 .\" Copyright 1998 by the Massachusetts Institute of Technology.
 .\"
@@ -20,6 +20,9 @@ ares_search \- Initiate a DNS query with domain search
 .SH SYNOPSIS
 .nf
 .B #include <ares.h>
+.PP
+.B typedef void (*ares_callback)(void *\fIarg\fP, int \fIstatus\fP,
+.B	unsigned char *\fIabuf\fP, int \fIalen\fP)
 .PP
 .B void ares_search(ares_channel \fIchannel\fP, const char *\fIname\fP,
 .B 	int \fIclass\fP, int \fItype\fP, ares_callback \fIcallback\fP,
@@ -45,21 +48,13 @@ give the class and type of the query using the values defined in
 .BR <arpa/nameser.h> .
 When the query sequence is complete or has failed, the ares library
 will invoke
-.IR callback ,
-which should have the following prototype:
-.PP
-.RS
-.nf
-.B void callback(void *\fIarg\fP, int \fIstatus\fP,
-.B	unsigned char *\fIabuf\fP, int \fIalen\fP)
-.fi
-.RE
-.PP
+.IR callback .
 Completion or failure of the query sequence may happen immediately, or
 may happen during a later call to
 .BR ares_process (3)
 or
 .BR ares_destroy (3).
+.PP
 The callback argument
 .I arg
 is copied from the
@@ -81,7 +76,8 @@ search domain appended, a response was returned with no answers.
 .TP 19
 .B ARES_EFORMERR
 A query completed but the server claimed that the query was
-malformatted..TP 19
+malformatted.
+.TP 19
 .B ARES_ESERVFAIL
 No query completed successfully; when the query was tried without a
 search domain appended, the server claimed to have experienced a
@@ -116,7 +112,7 @@ responses are ignored at the
 level.)
 .TP 19
 .B ARES_TIMEOUT
-No name servers responded to a query within the timeout.
+No name servers responded to a query within the timeout period.
 .TP 19
 .B ARES_ECONNREFUSED
 No name servers could be contacted.
@@ -141,8 +137,6 @@ will usually be 0, but in some cases an unsuccessful query result may
 be placed in
 .IR abuf .
 .SH SEE ALSO
-.BR ares_fds (3),
-.BR ares_timeout (3),
 .BR ares_process (3)
 .SH AUTHOR
 Greg Hudson, MIT Information Systems

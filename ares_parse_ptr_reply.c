@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_parse_ptr_reply.c,v 1.1 1998/08/13 18:06:32 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -22,6 +22,7 @@ static const char rcsid[] = "$Id";
 #include <string.h>
 #include <netdb.h>
 #include "ares.h"
+#include "ares_dns.h"
 #include "ares_private.h"
 
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
@@ -40,8 +41,8 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
     return ARES_EBADRESP;
 
   /* Fetch the question and answer count from the header. */
-  qdcount = abuf[4] << 8 | abuf[5];
-  ancount = abuf[6] << 8 | abuf[7];
+  qdcount = DNS_HEADER_QDCOUNT(abuf);
+  ancount = DNS_HEADER_ANCOUNT(abuf);
   if (qdcount != 1)
     return ARES_EBADRESP;
 
@@ -58,7 +59,6 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
   aptr += len + QFIXEDSZ;
 
   /* Examine each answer resource record (RR) in turn. */
-  status = ARES_SUCCESS;
   hostname = NULL;
   for (i = 0; i < ancount; i++)
     {
@@ -72,9 +72,9 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 	  status = ARES_EBADRESP;
 	  break;
 	}
-      rr_type = aptr[0] << 8 | aptr[1];
-      rr_class = aptr[2] << 8 | aptr[3];
-      rr_len = aptr[8] << 8 | aptr[9];
+      rr_type = DNS_RR_TYPE(aptr);
+      rr_class = DNS_RR_CLASS(aptr);
+      rr_len = DNS_RR_LEN(aptr);
       aptr += RRFIXEDSZ;
 
       if (rr_class == C_IN && rr_type == T_PTR
@@ -133,6 +133,7 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 		      memcpy(hostent->h_addr_list[0], addr, addrlen);
 		      hostent->h_addr_list[1] = NULL;
 		      *host = hostent;
+		      free(ptrname);
 		      return ARES_SUCCESS;
 		    }
 		  free(hostent->h_addr_list[0]);
@@ -141,6 +142,7 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 	    }
 	  free(hostent);
 	}
+      status = ARES_ENOMEM;
     }
   if (hostname)
     free(hostname);

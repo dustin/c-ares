@@ -13,9 +13,10 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_init.c,v 1.2 1998/08/13 18:14:39 ghudson Exp $";
 
 #include <sys/types.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
@@ -54,6 +55,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   ares_channel channel;
   int i, status;
   struct server_state *server;
+  struct timeval tv;
 
   channel = malloc(sizeof(struct ares_channeldata));
   if (!channel)
@@ -66,7 +68,8 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   channel->timeout = -1;
   channel->tries = -1;
   channel->ndots = -1;
-  channel->port = -1;
+  channel->udp_port = -1;
+  channel->tcp_port = -1;
   channel->nservers = -1;
   channel->ndomains = -1;
   channel->lookups = NULL;
@@ -83,6 +86,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
     status = init_by_defaults(channel);
   if (status != ARES_SUCCESS)
     {
+      /* Something failed; clean up memory we may have allocated. */
       if (channel->nservers != -1)
 	free(channel->servers);
       if (channel->ndomains != -1)
@@ -113,7 +117,8 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
       server->qtail = NULL;
     }
 
-  channel->next_id = (time(NULL) ^ getpid()) & 0xffff;
+  gettimeofday(&tv, NULL);
+  channel->next_id = (tv.tv_sec ^ tv.tv_usec ^ getpid()) & 0xffff;
   channel->queries = NULL;
 
   *channelptr = channel;
@@ -126,19 +131,21 @@ static int init_by_options(ares_channel channel, struct ares_options *options,
   int i;
 
   /* Easy stuff. */
-  if (optmask & ARES_OPT_FLAGS && channel->flags == -1)
+  if ((optmask & ARES_OPT_FLAGS) && channel->flags == -1)
     channel->flags = options->flags;
-  if (optmask & ARES_OPT_TIMEOUT && channel->timeout == -1)
+  if ((optmask & ARES_OPT_TIMEOUT) && channel->timeout == -1)
     channel->timeout = options->timeout;
-  if (optmask & ARES_OPT_TRIES && channel->tries == -1)
+  if ((optmask & ARES_OPT_TRIES) && channel->tries == -1)
     channel->tries = options->tries;
-  if (optmask & ARES_OPT_NDOTS && channel->ndots == -1)
+  if ((optmask & ARES_OPT_NDOTS) && channel->ndots == -1)
     channel->ndots = options->ndots;
-  if (optmask & ARES_OPT_PORT && channel->port == -1)
-    channel->port = options->port;
+  if ((optmask & ARES_OPT_UDP_PORT) && channel->udp_port == -1)
+    channel->udp_port = options->udp_port;
+  if ((optmask & ARES_OPT_TCP_PORT) && channel->tcp_port == -1)
+    channel->tcp_port = options->tcp_port;
 
   /* Copy the servers, if given. */
-  if (optmask & ARES_OPT_SERVERS && channel->nservers == -1)
+  if ((optmask & ARES_OPT_SERVERS) && channel->nservers == -1)
     {
       channel->servers =
 	malloc(options->nservers * sizeof(struct server_state));
@@ -149,8 +156,10 @@ static int init_by_options(ares_channel channel, struct ares_options *options,
       channel->nservers = options->nservers;
     }
 
-  /* Copy the domains, if given. */
-  if (optmask & ARES_OPT_DOMAINS && channel->ndomains == -1)
+  /* Copy the domains, if given.  Keep channel->ndomains consistent so
+   * we can clean up in case of error.
+   */
+  if ((optmask & ARES_OPT_DOMAINS) && channel->ndomains == -1)
     {
       channel->domains = malloc(options->ndomains * sizeof(char *));
       if (!channel->domains && options->ndomains != 0)
@@ -166,7 +175,7 @@ static int init_by_options(ares_channel channel, struct ares_options *options,
     }
 
   /* Set lookups, if given. */
-  if (optmask & ARES_OPT_LOOKUPS && !channel->lookups)
+  if ((optmask & ARES_OPT_LOOKUPS) && !channel->lookups)
     {
       channel->lookups = strdup(options->lookups);
       if (!channel->lookups)
@@ -181,7 +190,7 @@ static int init_by_environment(ares_channel channel)
   const char *localdomain, *res_options;
   int status;
 
-  localdomain = getenv("LOCALDOMAINS");
+  localdomain = getenv("LOCALDOMAIN");
   if (localdomain && channel->ndomains == -1)
     {
       status = set_search(channel, localdomain);
@@ -204,19 +213,19 @@ static int init_by_resolv_conf(ares_channel channel)
 {
   FILE *fp;
   char *line = NULL, *p, *q, lookups[3], *l;
-  int linesize, status, n;
-  struct server_ent *servhead = NULL, *servtail = NULL, *ent;
+  int linesize, status, n = 0;
+  struct server_ent *servhead = NULL, *ent;
   struct in_addr addr;
 
   fp = fopen(PATH_RESOLV_CONF, "r");
   if (!fp)
     return (errno == ENOENT) ? ARES_SUCCESS : ARES_EFILE;
-  status = ARES_SUCCESS;
   while ((status = ares__read_line(fp, &line, &linesize)) == ARES_SUCCESS)
     {
       if (strncmp(line, "domain", 6) == 0 && isspace(line[6])
 	  && channel->ndomains == -1)
 	{
+	  /* Set the domain search list to a single domain. */
 	  p = line + 6;
 	  while (isspace(*p))
 	    p++;
@@ -231,6 +240,10 @@ static int init_by_resolv_conf(ares_channel channel)
       else if (strncmp(line, "lookup", 6) == 0 && isspace(line[6])
 	       && !channel->lookups)
 	{
+	  /* Set the lookup order.  Only the first letter of each work
+	   * is relevant, and it has to be "b" for DNS or "f" for the
+	   * host file.  Ignore everything else.
+	   */
 	  l = lookups;
 	  p = line + 6;
 	  while (isspace(*p))
@@ -255,6 +268,7 @@ static int init_by_resolv_conf(ares_channel channel)
       else if (strncmp(line, "search", 6) == 0 && isspace(line[6])
 	       && channel->ndomains == -1)
 	{
+	  /* Set the domain search list to one or more domains. */
 	  status = set_search(channel, line + 6);
 	  if (status != ARES_SUCCESS)
 	    break;
@@ -262,6 +276,7 @@ static int init_by_resolv_conf(ares_channel channel)
       else if (strncmp(line, "nameserver", 10) == 0 && isspace(line[10])
 	       && channel->nservers == -1)
 	{
+	  /* Add a name server entry to our linked queue. */
 	  p = line + 10;
 	  while (isspace(*p))
 	    p++;
@@ -275,15 +290,13 @@ static int init_by_resolv_conf(ares_channel channel)
 	      break;
 	    }
 	  ent->addr = addr;
-	  ent->next = NULL;
-	  if (servtail)
-	    servtail->next = ent;
-	  else
-	    servhead = ent;
-	  servtail = ent;
+	  ent->next = servhead;
+	  servhead = ent;
+	  n++;
 	}
       else if (strncmp(line, "options", 7) == 0 && isspace(line[7]))
 	{
+	  /* Set resolver options. */
 	  status = set_options(channel, line + 7);
 	  if (status != ARES_SUCCESS)
 	    break;
@@ -294,31 +307,29 @@ static int init_by_resolv_conf(ares_channel channel)
 
   /* If all went well and we got any servers (which only happens when
    * channel->nservers was -1 coming into this function), turn the
-   * linked queue of servers into an array.
+   * linked list of servers into an array.
    */
   if (status == ARES_EOF && servhead)
     {
-      n = 0;
-      for (ent = servhead; ent; ent = ent->next)
-	n++;
       channel->servers = malloc(n * sizeof(struct server_state));
       if (channel->servers)
 	{
 	  channel->nservers = n;
-	  n = 0;
 	  for (ent = servhead; ent; ent = ent->next)
-	    channel->servers[n++].addr = ent->addr;
+	    channel->servers[--n].addr = ent->addr;
 	}
       else
 	status = ARES_ENOMEM;
     }
 
+  /* Free the linked queue. */
   while (servhead)
     {
       ent = servhead;
       servhead = servhead->next;
       free(ent);
     }
+
   return (status == ARES_EOF) ? ARES_SUCCESS : status;
 }
 
@@ -334,11 +345,14 @@ static int init_by_defaults(ares_channel channel)
     channel->tries = DEFAULT_TRIES;
   if (channel->ndots == -1)
     channel->ndots = 1;
-  if (channel->port == -1)
-    channel->port = htons(NAMESERVER_PORT);
+  if (channel->udp_port == -1)
+    channel->udp_port = htons(NAMESERVER_PORT);
+  if (channel->tcp_port == -1)
+    channel->tcp_port = htons(NAMESERVER_PORT);
 
   if (channel->nservers == -1)
     {
+      /* If nobody specified servers, try a local named. */
       channel->servers = malloc(sizeof(struct server_state));
       if (!channel->servers)
 	return ARES_ENOMEM;
@@ -348,6 +362,9 @@ static int init_by_defaults(ares_channel channel)
 
   if (channel->ndomains == -1)
     {
+      /* Derive a default domain search list from the kernel hostname,
+       * or set it to empty if the hostname isn't helpful.
+       */
       if (gethostname(hostname, sizeof(hostname)) == -1
 	  || !strchr(hostname, '.'))
 	{
@@ -443,6 +460,12 @@ static int set_options(ares_channel channel, const char *str)
       if (q - p > 6 && strncmp(p, "ndots:", 6) == 0
 	  && channel->ndots == -1)
 	channel->ndots = atoi(p + 6);
+      else if (q - p > 7 && strncmp(p, "retrans:", 7) == 0
+	       && channel->timeout == -1)
+	channel->timeout = atoi(p + 7);
+      else if (q - p > 6 && strncmp(p, "retry:", 6) == 0
+	       && channel->tries == -1)
+	channel->tries = atoi(p + 6);
       p = q;
       while (isspace(*p))
 	p++;

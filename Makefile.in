@@ -1,20 +1,16 @@
-# $Id$
+# $Id: Makefile.in,v 1.1 1998/08/13 18:08:45 ghudson Exp $
 
 SHELL=/bin/sh
 INSTALL=@INSTALL@
-INSTALL_PROGRAM=@INSTALL_PROGRAM@
 RANLIB=@RANLIB@
 VPATH=@srcdir@
 srcdir=@srcdir@
 top_srcdir=@top_srcdir@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
-bindir=@bindir@
 libdir=@libdir@
 includedir=@includedir@
 mandir=@mandir@
-sysconfdir=@sysconfdir@
-lbindir=@lbindir@
 
 CC=@CC@
 CPPFLAGS=@CPPFLAGS@
@@ -30,7 +26,7 @@ OBJS=	ares__close_sockets.o ares__get_hostent.o ares__read_line.o \
 	ares_parse_ptr_reply.o ares_process.o ares_query.o ares_search.o \
 	ares_send.o ares_strerror.o ares_timeout.o
 
-all: libares.a adig
+all: libares.a adig ahost
 
 libares.a: ${OBJS}
 	ar cru $@ ${OBJS}
@@ -39,7 +35,10 @@ libares.a: ${OBJS}
 adig: adig.o libares.a
 	${CC} ${LDFLAGS} -o $@ adig.o libares.a ${LIBS}
 
-${OBJS}: ares.h ares_private.h
+ahost: ahost.o libares.a
+	${CC} ${LDFLAGS} -o $@ ahost.o libares.a ${LIBS}
+
+${OBJS}: ares.h ares_dns.h ares_private.h
 
 .c.o:
 	${CC} -c ${ALL_CFLAGS} $<
@@ -80,7 +79,7 @@ install:
 	${INSTALL} -m 444 ${srcdir}/ares_timeout.3 ${DESTDIR}${mandir}/man3
 
 clean:
-	rm -f ${OBJS} libares.a adig.o adig
+	rm -f ${OBJS} libares.a adig.o adig ahost.o ahost
 
 distclean: clean
 	rm -f config.cache config.log config.status Makefile

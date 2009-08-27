@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_gethostbyname.c,v 1.1 1998/08/13 18:06:30 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -54,12 +54,16 @@ void ares_gethostbyname(ares_channel channel, const char *name, int family,
   struct hostent *host;
   struct host_query *hquery;
 
+  /* Right now we only know how to look up Internet addresses. */
   if (family != AF_INET)
     {
       callback(arg, ARES_ENOTIMP, NULL);
       return;
     }
 
+  /* If the name looks like an IP address, fake up a host entry and
+   * end the query immediately.
+   */
   for (p = name; *p; p++)
     {
       if (!isdigit(*p) && *p != '.')
@@ -74,6 +78,7 @@ void ares_gethostbyname(ares_channel channel, const char *name, int family,
       return;
     }
 
+  /* Allocate and fill in the host query structure. */
   hquery = malloc(sizeof(struct host_query));
   if (!hquery)
     {
@@ -92,6 +97,7 @@ void ares_gethostbyname(ares_channel channel, const char *name, int family,
   hquery->arg = arg;
   hquery->remaining_lookups = channel->lookups;
 
+  /* Start performing lookups according to channel->lookups. */
   next_lookup(hquery);
 }
 
@@ -106,11 +112,14 @@ static void next_lookup(struct host_query *hquery)
       switch (*p)
 	{
 	case 'b':
+	  /* DNS lookup */
 	  hquery->remaining_lookups = p + 1;
 	  ares_search(hquery->channel, hquery->name, C_IN, T_A, host_callback,
 		      hquery);
 	  return;
+
 	case 'f':
+	  /* Host file lookup */
 	  status = file_lookup(hquery->name, &host);
 	  if (status != ARES_ENOTFOUND)
 	    {
@@ -153,6 +162,8 @@ static int fake_hostent(const char *name, struct hostent **host)
 {
   struct in_addr addr;
   struct hostent *hostent;
+
+  *host = NULL;
 
   addr.s_addr = inet_addr(name);
   if (addr.s_addr == INADDR_NONE)

@@ -1,4 +1,4 @@
-.\" $Id$
+.\" $Id: ares_query.3,v 1.1 1998/08/13 18:07:34 ghudson Exp $
 .\"
 .\" Copyright 1998 by the Massachusetts Institute of Technology.
 .\"
@@ -21,6 +21,9 @@ ares_query \- Initiate a single-question DNS query
 .nf
 .B #include <ares.h>
 .PP
+.B typedef void (*ares_callback)(void *\fIarg\fP, int \fIstatus\fP,
+.B	unsigned char *\fIabuf\fP, int \fIalen\fP)
+.PP
 .B void ares_query(ares_channel \fIchannel\fP, const char *\fIname\fP,
 .B 	int \fIclass\fP, int \fItype\fP, ares_callback \fIcallback\fP,
 .B	void *\fIarg\fP)
@@ -42,21 +45,13 @@ and
 give the class and type of the query using the values defined in
 .BR <arpa/nameser.h> .
 When the query is complete or has failed, the ares library will invoke
-.IR callback ,
-which should have the following prototype:
-.PP
-.RS
-.nf
-.B void callback(void *\fIarg\fP, int \fIstatus\fP,
-.B	unsigned char *\fIabuf\fP, int \fIalen\fP)
-.fi
-.RE
-.PP
+.IR callback .
 Completion or failure of the query may happen immediately, or may
 happen during a later call to
 .BR ares_process (3)
 or
 .BR ares_destroy (3).
+.PP
 The callback argument
 .I arg
 is copied from the
@@ -116,7 +111,7 @@ zero-length label or because it contained a label of more than 63
 characters.
 .TP 19
 .B ARES_ETIMEOUT
-No name servers responded within the timeout.
+No name servers responded within the timeout period.
 .TP 19
 .B ARES_ECONNREFUSED
 No name servers could be contacted.
@@ -140,8 +135,6 @@ will be NULL and
 .I alen
 will be 0.
 .SH SEE ALSO
-.BR ares_fds (3),
-.BR ares_timeout (3),
 .BR ares_process (3)
 .SH AUTHOR
 Greg Hudson, MIT Information Systems

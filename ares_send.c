@@ -13,12 +13,14 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_send.c,v 1.1 1998/08/13 18:06:34 ghudson Exp $";
 
 #include <sys/types.h>
+#include <arpa/nameser.h>
 #include <stdlib.h>
 #include <time.h>
 #include "ares.h"
+#include "ares_dns.h"
 #include "ares_private.h"
 
 void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
@@ -29,7 +31,7 @@ void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
   time_t now;
 
   /* Verify that the query is at least long enough to hold the header. */
-  if (qlen < 12)
+  if (qlen < HFIXEDSZ || qlen >= (1 << 16))
     {
       callback(arg, ARES_EBADQUERY, NULL, 0);
       return;
@@ -59,7 +61,7 @@ void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
     }
 
   /* Compute the query ID.  Start with no timeout. */
-  query->qid = qbuf[0] << 8 | qbuf[1];
+  query->qid = DNS_HEADER_QID(qbuf);
   query->timeout = 0;
 
   /* Form the TCP query buffer by prepending qlen (as two
@@ -81,7 +83,7 @@ void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
   query->server = 0;
   for (i = 0; i < channel->nservers; i++)
     query->skip_server[i] = 0;
-  query->using_tcp = (channel->flags & ARES_FLAG_USEVC) ? 1 : 0;
+  query->using_tcp = (channel->flags & ARES_FLAG_USEVC) || qlen > PACKETSZ;
   query->error_status = ARES_ECONNREFUSED;
 
   /* Chain the query into this channel's query list. */
@@ -90,5 +92,5 @@ void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
 
   /* Perform the first query action. */
   time(&now);
-  ares__current_server(channel, query, now);
+  ares__send_query(channel, query, now);
 }

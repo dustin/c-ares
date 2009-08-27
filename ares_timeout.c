@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_timeout.c,v 1.1 1998/08/13 18:06:35 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -21,7 +21,8 @@ static const char rcsid[] = "$Id";
 #include "ares.h"
 #include "ares_private.h"
 
-struct timeval *ares_timeout(ares_channel channel, struct timeval *tv)
+struct timeval *ares_timeout(ares_channel channel, struct timeval *maxtv,
+			     struct timeval *tvbuf)
 {
   struct query *query;
   time_t now;
@@ -29,7 +30,7 @@ struct timeval *ares_timeout(ares_channel channel, struct timeval *tv)
 
   /* No queries, no timeout (and no fetch of the current time). */
   if (!channel->queries)
-    return NULL;
+    return maxtv;
 
   /* Find the minimum timeout for the current set of queries. */
   time(&now);
@@ -45,13 +46,16 @@ struct timeval *ares_timeout(ares_channel channel, struct timeval *tv)
 	min_offset = offset;
     }
 
-  /* Return the minimum timeout found, or NULL if there are no timeouts. */
-  if (min_offset != -1)
+  /* If we found a minimum timeout and it's sooner than the one
+   * specified in maxtv (if any), return it.  Otherwise go with
+   * maxtv.
+   */
+  if (min_offset != -1 && (!maxtv || min_offset <= maxtv->tv_sec))
     {
-      tv->tv_sec = min_offset;
-      tv->tv_usec = 0;
-      return tv;
+      tvbuf->tv_sec = min_offset;
+      tvbuf->tv_usec = 0;
+      return tvbuf;
     }
   else
-    return NULL;
+    return maxtv;
 }

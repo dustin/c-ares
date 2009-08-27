@@ -13,7 +13,7 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id";
+static const char rcsid[] = "$Id: ares_gethostbyaddr.c,v 1.1 1998/08/13 18:06:29 ghudson Exp $";
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -75,20 +75,22 @@ static void next_lookup(struct addr_query *aquery)
   char name[64];
   int a1, a2, a3, a4, status;
   struct hostent *host;
+  unsigned long addr;
 
   for (p = aquery->remaining_lookups; *p; p++)
     {
       switch (*p)
 	{
 	case 'b':
-	  a1 = aquery->addr.s_addr >> 24;
-	  a2 = (aquery->addr.s_addr >> 16) & 0xff;
-	  a3 = (aquery->addr.s_addr >> 8) & 0xff;
-	  a4 = aquery->addr.s_addr & 0xff;
+	  addr = ntohl(aquery->addr.s_addr);
+	  a1 = addr >> 24;
+	  a2 = (addr >> 16) & 0xff;
+	  a3 = (addr >> 8) & 0xff;
+	  a4 = addr & 0xff;
 	  sprintf(name, "%d.%d.%d.%d.in-addr.arpa", a4, a3, a2, a1);
 	  aquery->remaining_lookups = p + 1;
-	  ares_search(aquery->channel, name, C_IN, T_PTR, addr_callback,
-		      aquery);
+	  ares_query(aquery->channel, name, C_IN, T_PTR, addr_callback,
+		     aquery);
 	  return;
 	case 'f':
 	  status = file_lookup(&aquery->addr, &host);

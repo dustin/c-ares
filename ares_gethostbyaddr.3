@@ -1,4 +1,4 @@
-.\" $Id$
+.\" $Id: ares_gethostbyaddr.3,v 1.1 1998/08/13 18:07:30 ghudson Exp $
 .\"
 .\" Copyright 1998 by the Massachusetts Institute of Technology.
 .\"
@@ -21,6 +21,9 @@ ares_gethostbyaddr \- Initiate a host query by address
 .nf
 .B #include <ares.h>
 .PP
+.B typedef void (*ares_host_callback)(void *\fIarg\fP, int \fIstatus\fP,
+.B	struct hostent *\fIhostent\fP)
+.PP
 .B void ares_gethostbyaddr(ares_channel \fIchannel\fP, const void *\fIaddr\fP,
 .B 	int \fIaddrlen\fP, int \fIfamily\fP, ares_host_callback \fIcallback\fP,
 .B 	void *\fIarg\fP)
@@ -39,21 +42,13 @@ give the address as a series of bytes, and
 .I family
 gives the type of address.  When the query is complete or has failed,
 the ares library will invoke
-.IR callback ,
-which should have the following prototype:
-.PP
-.RS
-.nf
-.B void callback(void *\fIarg\fP, int \fIstatus\fP,
-.B 	struct hostent *\fIhost\fP)
-.fi
-.RE
-.PP
+.IR callback .
 Completion or failure of the query may happen immediately, or may
 happen during a later call to
 .BR ares_process (3)
 or
 .BR ares_destroy (3).
+.PP
 The callback argument
 .I arg
 is copied from the
@@ -86,20 +81,18 @@ The name service channel
 is being destroyed; the query will not be completed.
 .PP
 On successful completion of the query, the callback argument
-.I host
+.I hostent
 points to a
 .B struct hostent
 containing the name of the host returned by the query.  The callback
 need not and should not attempt to free the memory pointed to by
-.IR host ;
+.IR hostent ;
 the ares library will free it when the callback returns.  If the query
 did not complete successfully,
-.I host
+.I hostent
 will be
 .BR NULL .
 .SH SEE ALSO
-.BR ares_fds (3),
-.BR ares_timeout (3),
 .BR ares_process (3)
 .SH AUTHOR
 Greg Hudson, MIT Information Systems
