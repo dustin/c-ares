@@ -13,8 +13,6 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_destroy.c,v 1.2 1998/09/22 01:46:10 ghudson Exp $";
-
 #include <stdlib.h>
 #include "ares.h"
 #include "ares_private.h"

@@ -13,16 +13,20 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_gethostbyaddr.c,v 1.1 1998/08/13 18:06:29 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/nameser.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_private.h"
 
@@ -135,6 +139,19 @@ static int file_lookup(struct in_addr *addr, struct hostent **host)
 {
   FILE *fp;
   int status;
+
+#ifdef WIN32
+
+  char PATH_HOSTS[MAX_PATH];
+  if (IsNT) {
+    GetSystemDirectory(PATH_HOSTS, MAX_PATH);
+    strcat(PATH_HOSTS, PATH_HOSTS_NT);
+  } else {
+    GetWindowsDirectory(PATH_HOSTS, MAX_PATH);
+    strcat(PATH_HOSTS, PATH_HOSTS_9X);
+  }
+
+#endif
 
   fp = fopen(PATH_HOSTS, "r");
   if (!fp)

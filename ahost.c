@@ -13,18 +13,21 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ahost.c,v 1.4 2001/04/02 17:39:42 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#else
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_dns.h"
 
@@ -44,13 +47,19 @@ int main(int argc, char **argv)
   char *errmem;
   struct in_addr addr;
 
+#ifdef WIN32
+  WORD wVersionRequested = MAKEWORD(1,1);
+  WSADATA wsaData;
+  WSAStartup(wVersionRequested, &wsaData);
+#endif  
+
   if (argc == 0)
     usage();
 
   status = ares_init(&channel);
   if (status != ARES_SUCCESS)
     {
-      fprintf(stderr, "ares_init: %s\n", ares_strerror(status, &errmem));
+      fprintf(stderr, "ares_init: %s\n", ares_strerror(status));
       ares_free_errmem(errmem);
       return 1;
     }
@@ -92,7 +101,7 @@ static void callback(void *arg, int status, struct hostent *host)
 
   if (status != ARES_SUCCESS)
     {
-      fprintf(stderr, "%s: %s\n", (char *) arg, ares_strerror(status, &mem));
+      fprintf(stderr, "%s: %s\n", (char *) arg, ares_strerror(status));
       ares_free_errmem(mem);
       return;
     }

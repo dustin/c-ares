@@ -13,26 +13,35 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: adig.c,v 1.9 2001/05/18 20:59:51 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#include <unistd.h>
+#include <netdb.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <unistd.h>
 #include <errno.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_dns.h"
 
 #ifndef INADDR_NONE
 #define	INADDR_NONE 0xffffffff
+#endif
+
+/* Mac OS X portability check */
+#ifndef T_SRV
+#define T_SRV 33 /* server selection */
 #endif
 
 extern int optind;
@@ -133,6 +142,12 @@ int main(int argc, char **argv)
   struct timeval *tvp, tv;
   char *errmem;
 
+#ifdef WIN32
+  WORD wVersionRequested = MAKEWORD(1,1);
+  WSADATA wsaData;
+  WSAStartup(wVersionRequested, &wsaData);
+#endif  
+
   options.flags = ARES_FLAG_NOCHECKRESP;
   options.servers = NULL;
   options.nservers = 0;
@@ -220,10 +235,11 @@ int main(int argc, char **argv)
     usage();
 
   status = ares_init_options(&channel, &options, optmask);
+
   if (status != ARES_SUCCESS)
     {
       fprintf(stderr, "ares_init_options: %s\n",
-	      ares_strerror(status, &errmem));
+	      ares_strerror(status));
       ares_free_errmem(errmem);
       return 1;
     }
@@ -279,7 +295,7 @@ static void callback(void *arg, int status, unsigned char *abuf, int alen)
    */
   if (status != ARES_SUCCESS)
     {
-      printf("%s\n", ares_strerror(status, &errmem));
+      printf("%s\n", ares_strerror(status));
       ares_free_errmem(errmem);
       if (!abuf)
 	return;

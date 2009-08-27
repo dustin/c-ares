@@ -13,16 +13,20 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_parse_a_reply.c,v 1.2 1998/08/17 21:45:51 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <arpa/nameser.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_dns.h"
 #include "ares_private.h"

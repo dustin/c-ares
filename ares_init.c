@@ -13,22 +13,26 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_init.c,v 1.7 1999/10/23 19:28:13 danw Exp $";
-
 #include <sys/types.h>
-#include <sys/time.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/param.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <arpa/nameser.h>
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <unistd.h>
 #include <errno.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_private.h"
 
@@ -80,6 +84,7 @@ int ares_init_options(ares_channel *channelptr, struct ares_options *options,
   channel->ndomains = -1;
   channel->nsort = -1;
   channel->lookups = NULL;
+  channel->queries = NULL;
 
   /* Initialize configuration by each of the four sources, from highest
    * precedence to lowest.
@@ -222,6 +227,60 @@ static int init_by_environment(ares_channel channel)
 
   return ARES_SUCCESS;
 }
+#ifdef WIN32
+static int get_res_size_nt(HKEY hKey, char *subkey, int *size)
+{
+	return RegQueryValueEx(hKey, subkey, 0, NULL, NULL, size);
+}
+
+/* Warning: returns a dynamically allocated buffer, the user MUST
+ * use free() if the function returns 1
+ */
+static int get_res_nt(HKEY hKey, char *subkey, char **obuf)
+{
+	/* Test for the size we need */
+	int size = 0;
+	int result;
+	result = RegQueryValueEx(hKey, subkey, 0, NULL, NULL, &size);
+	if ((result != ERROR_SUCCESS && result != ERROR_MORE_DATA) || !size)
+		return 0;
+	*obuf = malloc(size+1);
+
+	if (RegQueryValueEx(hKey, subkey, 0, NULL, *obuf, &size) != ERROR_SUCCESS)
+	{
+		free(*obuf);
+		return 0;
+	}
+	if (size == 1)
+	{
+		free(*obuf);
+		return 0;
+	}
+	return 1;
+}
+
+static int get_res_interfaces_nt(HKEY hKey, char *subkey, char **obuf)
+{
+	char enumbuf[39]; /* GUIDs are 38 chars + 1 for NULL */
+	int enum_size = 39;
+	int idx = 0;
+	HKEY hVal;
+	while (RegEnumKeyEx(hKey, idx++, enumbuf, &enum_size, 0, NULL, NULL, NULL) != ERROR_NO_MORE_ITEMS)
+	{
+		enum_size = 39;
+		if (RegOpenKeyEx(hKey, enumbuf, 0, KEY_QUERY_VALUE, &hVal) != ERROR_SUCCESS)
+			continue;
+		if (!get_res_nt(hVal, subkey, obuf))
+			RegCloseKey(hVal);
+		else
+		{
+			RegCloseKey(hVal);
+			return 1;
+		}
+	}
+	return 0;
+}
+#endif
 
 static int init_by_resolv_conf(ares_channel channel)
 {
@@ -230,6 +289,138 @@ static int init_by_resolv_conf(ares_channel channel)
   int linesize, status, nservers = 0, nsort = 0;
   struct server_state *servers = NULL;
   struct apattern *sortlist = NULL;
+
+#ifdef WIN32
+
+    /*
+  NameServer Registry:
+
+   On Windows 9X, the DNS server can be found in:
+HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VxD\MSTCP\NameServer
+
+	On Windows NT/2000/XP/2003:
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\NameServer
+	or
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\DhcpNameServer
+	or
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\{AdapterID}\
+NameServer
+	or
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\{AdapterID}\
+DhcpNameServer
+   */
+
+  HKEY mykey;
+  HKEY subkey;
+  DWORD data_type;
+  DWORD bytes;
+  DWORD result;
+  DWORD index;
+  char name[MAX_PATH];
+  DWORD keysize = MAX_PATH;
+
+  status = ARES_EFILE;
+
+  if (IsNT) 
+  {
+    if (RegOpenKeyEx(
+            HKEY_LOCAL_MACHINE, WIN_NS_NT_KEY, 0,
+            KEY_READ, &mykey
+        ) == ERROR_SUCCESS)
+    {
+		RegOpenKeyEx(mykey, "Interfaces", 0, KEY_QUERY_VALUE|KEY_ENUMERATE_SUB_KEYS, &subkey);
+		if (get_res_nt(mykey, NAMESERVER, &line))
+		{
+			status = config_nameserver(&servers, &nservers, line);
+			free(line);
+		}
+		else if (get_res_nt(mykey, DHCPNAMESERVER, &line))
+		{
+			status = config_nameserver(&servers, &nservers, line);
+			free(line);
+		}
+		/* Try the interfaces */
+		else if (get_res_interfaces_nt(subkey, NAMESERVER, &line))
+		{
+			status = config_nameserver(&servers, &nservers, line);
+			free(line);
+		}
+		else if (get_res_interfaces_nt(subkey, DHCPNAMESERVER, &line))
+		{
+			status = config_nameserver(&servers, &nservers, line);
+			free(line);
+		}
+		RegCloseKey(subkey);
+	    RegCloseKey(mykey);
+	}
+  } else {
+      if (RegOpenKeyEx(
+            HKEY_LOCAL_MACHINE, WIN_NS_9X, 0,
+            KEY_READ, &mykey
+          ) == ERROR_SUCCESS)
+      {
+        if ((result = RegQueryValueEx(
+                        mykey, NAMESERVER, NULL, &data_type,
+                        NULL, &bytes
+                      ) 
+            ) == ERROR_SUCCESS ||
+            result == ERROR_MORE_DATA)
+        {
+            if (bytes) {
+                line = (char *)malloc(bytes+1);
+                if (RegQueryValueEx(
+                    mykey, NAMESERVER, NULL, &data_type,
+                    (unsigned char *)line, &bytes
+                    ) == ERROR_SUCCESS) {
+                    status = config_nameserver(&servers, &nservers, line);
+                }
+                free(line);
+            }
+        }
+      } 
+      RegCloseKey(mykey);
+  }
+  
+  if (status != ARES_EFILE) {
+      /*
+      if (!channel->lookups) {
+          status = config_lookup(channel, "file bind");
+      }
+      */
+      status = ARES_EOF;
+  }
+
+#elif defined(riscos)
+
+  /* Under RISC OS, name servers are listed in the
+     system variable Inet$Resolvers, space separated. */
+
+  line = getenv("Inet$Resolvers");
+  status = ARES_EFILE;
+  if (line) {
+    char *resolvers = strdup(line), *pos, *space;
+
+    if (!resolvers)
+      return ARES_ENOMEM;
+
+    pos = resolvers;
+    do {
+      space = strchr(pos, ' ');
+      if (space)
+        *space = 0;
+      status = config_nameserver(&servers, &nservers, pos);
+      if (status != ARES_SUCCESS)
+        break;
+      pos = space + 1;
+    } while (space);
+
+    if (status == ARES_SUCCESS)
+      status = ARES_EOF;
+
+    free(resolvers);
+  }
+
+#else
 
   fp = fopen(PATH_RESOLV_CONF, "r");
   if (!fp)
@@ -256,11 +447,13 @@ static int init_by_resolv_conf(ares_channel channel)
   free(line);
   fclose(fp);
 
+#endif
+
   /* Handle errors. */
   if (status != ARES_EOF)
     {
-      free(servers);
-      free(sortlist);
+      if (servers != NULL) free(servers);
+      if (sortlist != NULL) free(sortlist);
       return status;
     }
 

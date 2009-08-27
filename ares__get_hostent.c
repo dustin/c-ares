@@ -13,17 +13,22 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares__get_hostent.c,v 1.3 2000/02/17 18:39:58 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <netdb.h>
+
 #include "ares.h"
 #include "ares_private.h"
 

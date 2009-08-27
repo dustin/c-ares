@@ -13,10 +13,11 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares__close_sockets.c,v 1.1 1998/08/13 18:06:22 ghudson Exp $";
-
 #include <stdlib.h>
+#ifdef WIN32
+#else
 #include <unistd.h>
+#endif
 #include "ares.h"
 #include "ares_private.h"
 
@@ -43,12 +44,12 @@ void ares__close_sockets(struct server_state *server)
   /* Close the TCP and UDP sockets. */
   if (server->tcp_socket != -1)
     {
-      close(server->tcp_socket);
+      closesocket(server->tcp_socket);
       server->tcp_socket = -1;
     }
   if (server->udp_socket != -1)
     {
-      close(server->udp_socket);
+      closesocket(server->udp_socket);
       server->udp_socket = -1;
     }
 }

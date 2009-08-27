@@ -13,11 +13,15 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_send.c,v 1.3 1999/10/23 19:28:14 danw Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <netinet/in.h>
 #include <arpa/nameser.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

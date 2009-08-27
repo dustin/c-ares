@@ -13,16 +13,21 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_process.c,v 1.7 2001/03/17 16:43:36 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/nameser.h>
+#include <unistd.h>
+#endif
+
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
@@ -84,10 +89,16 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
       for (sendreq = server->qhead; sendreq; sendreq = sendreq->next)
 	n++;
 
+#ifdef WIN32
+      vec = NULL;
+#else
       /* Allocate iovecs so we can send all our data at once. */
       vec = malloc(n * sizeof(struct iovec));
+#endif
       if (vec)
 	{
+#ifdef WIN32
+#else
 	  /* Fill in the iovecs and send. */
 	  n = 0;
 	  for (sendreq = server->qhead; sendreq; sendreq = sendreq->next)
@@ -123,12 +134,15 @@ static void write_tcp_data(ares_channel channel, fd_set *write_fds, time_t now)
 		  break;
 		}
 	    }
+#endif
 	}
       else
 	{
 	  /* Can't allocate iovecs; just send the first request. */
 	  sendreq = server->qhead;
-	  count = write(server->tcp_socket, sendreq->data, sendreq->len);
+
+          count = send(server->tcp_socket, sendreq->data, sendreq->len, 0);
+
 	  if (count < 0)
 	    {
 	      handle_error(channel, i, now);
@@ -173,9 +187,9 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
 	  /* We haven't yet read a length word, so read that (or
 	   * what's left to read of it).
 	   */
-	  count = read(server->tcp_socket,
-		       server->tcp_lenbuf + server->tcp_lenbuf_pos,
-		       2 - server->tcp_lenbuf_pos);
+          count = recv(server->tcp_socket,
+                       server->tcp_lenbuf + server->tcp_buffer_pos,
+                       2 - server->tcp_buffer_pos, 0);
 	  if (count <= 0)
 	    {
 	      handle_error(channel, i, now);
@@ -199,9 +213,9 @@ static void read_tcp_data(ares_channel channel, fd_set *read_fds, time_t now)
       else
 	{
 	  /* Read data into the allocated buffer. */
-	  count = read(server->tcp_socket,
+       	  count = recv(server->tcp_socket,
 		       server->tcp_buffer + server->tcp_buffer_pos,
-		       server->tcp_length - server->tcp_buffer_pos);
+		       server->tcp_length - server->tcp_buffer_pos, 0);
 	  if (count <= 0)
 	    {
 	      handle_error(channel, i, now);
@@ -236,6 +250,7 @@ static void read_udp_packets(ares_channel channel, fd_set *read_fds,
     {
       /* Make sure the server has a socket and is selected in read_fds. */
       server = &channel->servers[i];
+
       if (server->udp_socket == -1 || !FD_ISSET(server->udp_socket, read_fds))
 	continue;
 
@@ -442,18 +457,26 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
     return -1;
 
   /* Set the socket non-blocking. */
-  if (fcntl(s, F_GETFL, &flags) == -1)
+
+#ifdef WIN32
+  flags = 1;
+  ioctlsocket(s, FIONBIO, &flags);
+#else
+  flags = fcntl(s, F_GETFL, 0);
+
+  if (flags == -1)
     {
       close(s);
       return -1;
     }
-  flags &= O_NONBLOCK;
+  flags |= O_NONBLOCK;
   if (fcntl(s, F_SETFL, flags) == -1)
     {
       close(s);
       return -1;
     }
-
+#endif
+  
   /* Connect to the server. */
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
@@ -462,7 +485,7 @@ static int open_tcp_socket(ares_channel channel, struct server_state *server)
   if (connect(s, (struct sockaddr *) &sin, sizeof(sin)) == -1
       && errno != EINPROGRESS)
     {
-      close(s);
+      closesocket(s);
       return -1;
     }
 
@@ -487,7 +510,7 @@ static int open_udp_socket(ares_channel channel, struct server_state *server)
   sin.sin_port = channel->udp_port;
   if (connect(s, (struct sockaddr *) &sin, sizeof(sin)) == -1)
     {
-      close(s);
+      closesocket(s);
       return -1;
     }
 

@@ -13,11 +13,15 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_mkquery.c,v 1.3 2000/09/21 19:15:51 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <netinet/in.h>
 #include <arpa/nameser.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include "ares.h"

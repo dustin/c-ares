@@ -13,18 +13,22 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_gethostbyname.c,v 1.7 1999/10/23 19:28:13 danw Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+#include "nameser.h"
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <arpa/nameser.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <netdb.h>
 #include "ares.h"
 #include "ares_private.h"
 
@@ -96,7 +100,7 @@ static void next_lookup(struct host_query *hquery)
   struct hostent *host;
 
   for (p = hquery->remaining_lookups; *p; p++)
-    {
+    { 
       switch (*p)
 	{
 	case 'b':
@@ -208,6 +212,19 @@ static int file_lookup(const char *name, struct hostent **host)
   FILE *fp;
   char **alias;
   int status;
+
+#ifdef WIN32
+
+  char PATH_HOSTS[MAX_PATH];
+  if (IsNT) {
+    GetSystemDirectory(PATH_HOSTS, MAX_PATH);
+    strcat(PATH_HOSTS, PATH_HOSTS_NT);
+  } else {
+    GetWindowsDirectory(PATH_HOSTS, MAX_PATH);
+    strcat(PATH_HOSTS, PATH_HOSTS_9X);
+  }
+
+#endif
 
   fp = fopen(PATH_HOSTS, "r");
   if (!fp)

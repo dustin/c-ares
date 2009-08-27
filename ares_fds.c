@@ -13,10 +13,14 @@
  * without express or implied warranty.
  */
 
-static const char rcsid[] = "$Id: ares_fds.c,v 1.2 1998/09/04 21:09:30 ghudson Exp $";
-
 #include <sys/types.h>
+
+#ifdef WIN32
+
+#else
 #include <sys/time.h>
+#endif
+
 #include "ares.h"
 #include "ares_private.h"
 

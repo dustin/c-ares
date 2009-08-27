@@ -1,4 +1,4 @@
-/* $Id: ares_private.h,v 1.3 1998/09/22 01:46:11 ghudson Exp $ */
+/* $Id: ares_private.h,v 1.1 2003/10/07 21:54:04 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -17,7 +17,15 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+
+#ifdef WIN32
+
+#else
 #include <netinet/in.h>
+/* We define closesocket() here so that we can use this function all over
+   the source code for closing sockets. */
+#define closesocket(x) close(x)
+#endif
 
 #define	DEFAULT_TIMEOUT		5
 #define DEFAULT_TRIES		4
@@ -25,11 +33,25 @@
 #define	INADDR_NONE 0xffffffff
 #endif
 
+#ifdef WIN32
+
+#define IsNT ((int)GetVersion()>0)
+#define WIN_NS_9X      "System\\CurrentControlSet\\Services\\VxD\\MSTCP"
+#define WIN_NS_NT_KEY  "System\\CurrentControlSet\\Services\\Tcpip\\Parameters"
+#define NAMESERVER     "NameServer"
+#define DHCPNAMESERVER "DhcpNameServer"
+#define PATH_HOSTS_NT  "\\drivers\\etc\\hosts"
+#define PATH_HOSTS_9X  "\\hosts"
+          
+#else
+
 #define PATH_RESOLV_CONF	"/etc/resolv.conf"
 #ifdef ETC_INET
 #define PATH_HOSTS		"/etc/inet/hosts"
 #else
 #define PATH_HOSTS		"/etc/hosts"
+#endif
+
 #endif
 
 struct send_request {
