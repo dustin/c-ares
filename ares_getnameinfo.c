@@ -1,4 +1,4 @@
-/* $Id: ares_getnameinfo.c,v 1.14 2005/12/11 23:37:59 yangtse Exp $ */
+/* $Id: ares_getnameinfo.c,v 1.16 2006-10-25 14:16:01 giva Exp $ */
 
 /* Copyright 2005 by Dominick Meglio
  *
@@ -264,11 +264,11 @@ static char *lookup_service(unsigned short port, int flags,
   char tmpbuf[4096];
 
   if (port)
-    { 
+    {
       if (flags & ARES_NI_NUMERICSERV)
         sep = NULL;
       else
-        { 
+        {
           if (flags & ARES_NI_UDP)
             proto = "udp";
           else if (flags & ARES_NI_SCTP)
@@ -288,15 +288,15 @@ static char *lookup_service(unsigned short port, int flags,
 #elif GETSERVBYPORT_R_ARGS == 4
           if (getservbyport_r(port, proto, &se, (void *)tmpbuf) != 0)
             sep = NULL;
-#else     
+#else
           /* Lets just hope the OS uses TLS! */
           sep = getservbyport(port, proto);
-#endif    
-#else     
+#endif
+#else
           /* Lets just hope the OS uses TLS! */
           sep = getservbyport(port, proto);
-#endif    
-        } 
+#endif
+        }
       if (sep && sep->s_name)
         /* get service name */
         strcpy(tmpbuf, sep->s_name);

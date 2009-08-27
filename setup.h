@@ -1,6 +1,8 @@
 #ifndef __ARES_SETUP_H
 #define __ARES_SETUP_H
 
+/* $Id: setup.h,v 1.23 2006-10-18 21:05:46 yangtse Exp $ */
+
 /* Copyright (C) 2004 - 2005 by Daniel Stenberg et al
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -43,7 +45,11 @@
  * Include header files for windows builds before redefining anything.
  * Use this preproessor block only to include or exclude windows.h,
  * winsock2.h, ws2tcpip.h or winsock.h. Any other windows thing belongs
- * to any other further and independant block.
+ * to any other further and independant block.  Under Cygwin things work
+ * just as under linux (e.g. <sys/socket.h>) and the winsock headers should
+ * never be included when __CYGWIN__ is defined.  configure script takes
+ * care of this, not defining HAVE_WINDOWS_H, HAVE_WINSOCK_H, HAVE_WINSOCK2_H,
+ * neither HAVE_WS2TCPIP_H when __CYGWIN__ is defined.
  */
 
 #ifdef HAVE_WINDOWS_H
@@ -60,6 +66,22 @@
 #    ifdef HAVE_WINSOCK_H
 #      include <winsock.h>
 #    endif
+#  endif
+#endif
+
+/*
+ * Define USE_WINSOCK to 2 if we have and use WINSOCK2 API, else
+ * define USE_WINSOCK to 1 if we have and use WINSOCK  API, else
+ * undefine USE_WINSOCK.
+ */
+
+#undef USE_WINSOCK
+
+#ifdef HAVE_WINSOCK2_H
+#  define USE_WINSOCK 2
+#else
+#  ifdef HAVE_WINSOCK_H
+#    define USE_WINSOCK 1
 #  endif
 #endif
 
@@ -99,7 +121,7 @@
  * Typedef our socket type
  */
 
-#if defined(WIN32) && !defined(WATT32)
+#ifdef USE_WINSOCK
 typedef SOCKET ares_socket_t;
 #define ARES_SOCKET_BAD INVALID_SOCKET
 #else
@@ -143,6 +165,14 @@ int ares_strcasecmp(const char *s1, const char *s2);
 #else
 #define AF_INET6 AF_MAX+1
 #endif
+#endif
+
+/*
+ * Include macros and defines that should only be processed once.
+ */
+
+#ifndef __SETUP_ONCE_H
+#include "setup_once.h"
 #endif
 
 #endif /* __ARES_SETUP_H */

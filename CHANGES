@@ -1,6 +1,40 @@
   Changelog for the c-ares project
 
+Version 1.3.2 (November 3, 2006)
+
+* October 12 2006
+
+- Prevent ares_getsock() to overflow if more than 16 sockets are used.
+
+* September 11 2006
+
+- Guilherme Balena Versiani: I noted a strange BUG in Win32 port
+  (ares_init.c/get_iphlpapi_dns_info() function): when I disable the network
+  by hand or disconnect the network cable in Windows 2000 or Windows XP, my
+  application gets 127.0.0.1 as the only name server. The problem comes from
+  'GetNetworkParams' function, that returns the empty string "" as the only
+  name server in that case. Moreover, the Windows implementation of
+  inet_addr() returns INADDR_LOOPBACK instead of INADDR_NONE.
+
+* August 29 2006
+
+- Brad Spencer did
+
+  o made ares_version.h use extern "C" for c++ compilers
+  o fixed compiler warnings in ares_getnameinfo.c
+  o fixed a buffer position init for TCP reads
+
+* August 3 2006
+
+- Ravi Pratap fixed ares_getsock() to actually return the proper bitmap and
+  not always zero!
+
 Version 1.3.1 (June 24, 2006)
+
+* July 23, 2006
+
+- Gisle Vanem added getopt() to the ahost program. Currently accepts
+  only [-t {a|aaaa}] to specify address family in ares_gethostbyname().
 
 * June 19, 2006
 

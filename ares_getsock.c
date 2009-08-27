@@ -1,6 +1,6 @@
-/* $Id: ares_getsock.c,v 1.1 2005/12/22 15:27:41 bagder Exp $ */
+/* $Id: ares_getsock.c,v 1.3 2006-10-12 16:47:50 bagder Exp $ */
 
-/* Copyright 2005 by Daniel Stenberg.
+/* Copyright (C) 2005 - 2006, Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -28,7 +28,6 @@ int ares_getsock(ares_channel channel,
                  int numsocks) /* size of the 'socks' array */
 {
   struct server_state *server;
-  ares_socket_t nfds;
   int i;
   int sockindex=0;
   int bitmap = 0;
@@ -40,8 +39,9 @@ int ares_getsock(ares_channel channel,
   if (!channel->queries)
     return 0;
 
-  nfds = 0;
-  for (i = 0; i < channel->nservers; i++)
+  for (i = 0;
+       (i < channel->nservers) && (sockindex < ARES_GETSOCK_MAXNUM);
+       i++)
     {
       server = &channel->servers[i];
       if (server->udp_socket != ARES_SOCKET_BAD)
@@ -58,14 +58,13 @@ int ares_getsock(ares_channel channel,
            break;
          socks[sockindex] = server->tcp_socket;
          bitmap |= ARES_GETSOCK_READABLE(setbits, sockindex);
-         sockindex++;
 
-         if (server->qhead) {
+         if (server->qhead)
            /* then the tcp socket is also writable! */
-           bitmap |= ARES_GETSOCK_WRITABLE(setbits, sockindex-1);
-         }
+           bitmap |= ARES_GETSOCK_WRITABLE(setbits, sockindex);
 
+         sockindex++;
        }
     }
-  return (int)nfds;
+  return bitmap;
 }

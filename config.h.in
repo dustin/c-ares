@@ -9,6 +9,9 @@
 /* if a /etc/inet dir is being used */
 #undef ETC_INET
 
+/* Define to the type qualifier of arg 1 for getnameinfo. */
+#undef GETNAMEINFO_QUAL_ARG1
+
 /* Define to the type of arg 1 for getnameinfo. */
 #undef GETNAMEINFO_TYPE_ARG1
 
@@ -51,6 +54,9 @@
 /* use FIONBIO for non-blocking sockets */
 #undef HAVE_FIONBIO
 
+/* If you have gethostbyname */
+#undef HAVE_GETHOSTBYNAME
+
 /* Define to 1 if you have the getnameinfo function. */
 #undef HAVE_GETNAMEINFO
 
@@ -87,14 +93,29 @@
 /* use Ioctlsocket() for non-blocking sockets */
 #undef HAVE_IOCTLSOCKET_CASE
 
+/* Define to 1 if you have the `dl' library (-ldl). */
+#undef HAVE_LIBDL
+
+/* Define to 1 if you have the `resolve' library (-lresolve). */
+#undef HAVE_LIBRESOLVE
+
+/* Define to 1 if you have the `socket' library (-lsocket). */
+#undef HAVE_LIBSOCKET
+
 /* if your compiler supports LL */
 #undef HAVE_LL
 
 /* if your compiler supports long long */
 #undef HAVE_LONGLONG
 
+/* Define to 1 if you have the malloc.h header file. */
+#undef HAVE_MALLOC_H
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the MSG_NOSIGNAL flag. */
+#undef HAVE_MSG_NOSIGNAL
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
@@ -110,6 +131,12 @@
 
 /* Define to 1 if you have PF_INET6. */
 #undef HAVE_PF_INET6
+
+/* Define to 1 if you have the recv function. */
+#undef HAVE_RECV
+
+/* Define to 1 if you have the send function. */
+#undef HAVE_SEND
 
 /* Define to 1 if your struct sockaddr_in6 has sin6_scope_id. */
 #undef HAVE_SOCKADDR_IN6_SIN6_SCOPE_ID
@@ -141,6 +168,9 @@
 /* if struct sockaddr_storage is defined */
 #undef HAVE_STRUCT_SOCKADDR_STORAGE
 
+/* Define to 1 if you have the timeval struct. */
+#undef HAVE_STRUCT_TIMEVAL
+
 /* Define to 1 if you have the <sys/ioctl.h> header file. */
 #undef HAVE_SYS_IOCTL_H
 
@@ -159,6 +189,9 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
 
+/* Define to 1 if you have the <time.h> header file. */
+#undef HAVE_TIME_H
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
@@ -173,6 +206,9 @@
 
 /* Define to 1 if you have the ws2tcpip.h header file. */
 #undef HAVE_WS2TCPIP_H
+
+/* Define to 1 if you need the malloc.h header file even with stdlib.h */
+#undef NEED_MALLOC_H
 
 /* Name of package */
 #undef PACKAGE
@@ -191,6 +227,39 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Define to the type of arg 1 for recv. */
+#undef RECV_TYPE_ARG1
+
+/* Define to the type of arg 2 for recv. */
+#undef RECV_TYPE_ARG2
+
+/* Define to the type of arg 3 for recv. */
+#undef RECV_TYPE_ARG3
+
+/* Define to the type of arg 4 for recv. */
+#undef RECV_TYPE_ARG4
+
+/* Define to the function return type for recv. */
+#undef RECV_TYPE_RETV
+
+/* Define to the type qualifier of arg 2 for send. */
+#undef SEND_QUAL_ARG2
+
+/* Define to the type of arg 1 for send. */
+#undef SEND_TYPE_ARG1
+
+/* Define to the type of arg 2 for send. */
+#undef SEND_TYPE_ARG2
+
+/* Define to the type of arg 3 for send. */
+#undef SEND_TYPE_ARG3
+
+/* Define to the type of arg 4 for send. */
+#undef SEND_TYPE_ARG4
+
+/* Define to the function return type for send. */
+#undef SEND_TYPE_RETV
 
 /* The size of `curl_off_t', as computed by sizeof. */
 #undef SIZEOF_CURL_OFF_T

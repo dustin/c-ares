@@ -1,4 +1,4 @@
-/* $Id: ares.h,v 1.23 2006-05-03 06:11:44 bagder Exp $ */
+/* $Id: ares.h,v 1.25 2006-10-11 16:01:16 yangtse Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *

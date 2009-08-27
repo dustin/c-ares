@@ -1,5 +1,7 @@
 #include "setup.h"
 
+/* $Id: windows_port.c,v 1.12 2006-07-28 18:01:23 yangtse Exp $ */
+
 /* only do the following on windows
  */
 #if (defined(WIN32) || defined(WATT32)) && !defined(MSDOS)
@@ -100,6 +102,6 @@ ares_writev (ares_socket_t s, const struct iovec *vector, size_t count)
     memcpy (bp, vector[i].iov_base, vector[i].iov_len);
     bp += vector[i].iov_len;
   }
-  return send (s, (const void*)buffer, bytes, 0);
+  return (int)swrite(s, buffer, bytes);
 }
 #endif /* WIN32 builds only */

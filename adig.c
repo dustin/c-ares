@@ -1,5 +1,7 @@
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
+ * $Id: adig.c,v 1.15 2006-10-31 17:51:54 giva Exp $
+ *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
  * fee is hereby granted, provided that the above copyright
@@ -16,7 +18,7 @@
 #include "setup.h"
 #include <sys/types.h>
 
-#ifdef WIN32
+#if defined(WIN32) && !defined(WATT32)
 #include "nameser.h"
 #else
 #include <sys/time.h>
@@ -153,8 +155,8 @@ int main(int argc, char **argv)
   fd_set read_fds, write_fds;
   struct timeval *tvp, tv;
 
-#ifdef WIN32
-  WORD wVersionRequested = MAKEWORD(1,1);
+#ifdef USE_WINSOCK
+  WORD wVersionRequested = MAKEWORD(USE_WINSOCK,USE_WINSOCK);
   WSADATA wsaData;
   WSAStartup(wVersionRequested, &wsaData);
 #endif
@@ -162,10 +164,16 @@ int main(int argc, char **argv)
   options.flags = ARES_FLAG_NOCHECKRESP;
   options.servers = NULL;
   options.nservers = 0;
-  while ((c = getopt(argc, argv, "f:s:c:t:T:U:")) != -1)
+  while ((c = getopt(argc, argv, "df:s:c:t:T:U:")) != -1)
     {
       switch (c)
         {
+        case 'd':
+#ifdef WATT32
+          dbug_init();
+#endif
+          break;
+
         case 'f':
           /* Add a flag. */
           for (i = 0; i < nflags; i++)
@@ -225,7 +233,7 @@ int main(int argc, char **argv)
 
         case 'T':
           /* Set the TCP port number. */
-          if (!isdigit((unsigned char)*optarg))
+          if (!ISDIGIT(*optarg))
             usage();
           options.tcp_port = (unsigned short)strtol(optarg, NULL, 0);
           optmask |= ARES_OPT_TCP_PORT;
@@ -233,7 +241,7 @@ int main(int argc, char **argv)
 
         case 'U':
           /* Set the UDP port number. */
-          if (!isdigit((unsigned char)*optarg))
+          if (!ISDIGIT(*optarg))
             usage();
           options.udp_port = (unsigned short)strtol(optarg, NULL, 0);
           optmask |= ARES_OPT_UDP_PORT;
@@ -396,7 +404,7 @@ static const unsigned char *display_question(const unsigned char *aptr,
    */
   if (aptr + QFIXEDSZ > abuf + alen)
     {
-      free(name);
+      ares_free_string(name);
       return NULL;
     }
 
@@ -412,7 +420,7 @@ static const unsigned char *display_question(const unsigned char *aptr,
   if (dnsclass != C_IN)
     printf("\t%s", class_name(dnsclass));
   printf("\t%s\n", type_name(type));
-  free(name);
+  ares_free_string(name);
   return aptr;
 }
 
@@ -436,7 +444,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
    */
   if (aptr + RRFIXEDSZ > abuf + alen)
     {
-      free(name);
+      ares_free_string(name);
       return NULL;
     }
 
@@ -449,7 +457,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
   aptr += RRFIXEDSZ;
   if (aptr + dlen > abuf + alen)
     {
-      free(name);
+      ares_free_string(name);
       return NULL;
     }
 
@@ -458,7 +466,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
   if (dnsclass != C_IN)
     printf("\t%s", class_name(dnsclass));
   printf("\t%s", type_name(type));
-  free(name);
+  ares_free_string(name);
 
   /* Display the RR data.  Don't touch aptr. */
   switch (type)
@@ -476,7 +484,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.", name);
-      free(name);
+      ares_free_string(name);
       break;
 
     case T_HINFO:
@@ -500,13 +508,13 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.", name);
-      free(name);
+      ares_free_string(name);
       p += len;
       status = ares_expand_name(p, abuf, alen, &name, &len);
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.", name);
-      free(name);
+      ares_free_string(name);
       break;
 
     case T_MX:
@@ -520,7 +528,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.", name);
-      free(name);
+      ares_free_string(name);
       break;
 
     case T_SOA:
@@ -532,13 +540,13 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.\n", name);
-      free(name);
+      ares_free_string(name);
       p += len;
       status = ares_expand_name(p, abuf, alen, &name, &len);
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t\t\t\t\t\t%s.\n", name);
-      free(name);
+      ares_free_string(name);
       p += len;
       if (p + 20 > aptr + dlen)
         return NULL;
@@ -592,7 +600,7 @@ static const unsigned char *display_rr(const unsigned char *aptr,
       if (status != ARES_SUCCESS)
         return NULL;
       printf("\t%s.", name);
-      free(name);
+      ares_free_string(name);
       break;
 
     default:
