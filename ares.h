@@ -1,4 +1,4 @@
-/* $Id: ares.h,v 1.6 2004/02/25 07:22:00 bagder Exp $ */
+/* $Id: ares.h,v 1.8 2004/04/01 08:25:58 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -55,6 +55,7 @@
 #define ARES_EFILE		14
 #define ARES_ENOMEM		15
 #define ARES_EDESTRUCTION	16
+#define ARES_EBADSTR		17
 
 /* Flag values */
 #define ARES_FLAG_USEVC		(1 << 0)
@@ -104,7 +105,7 @@ int ares_init(ares_channel *channelptr);
 int ares_init_options(ares_channel *channelptr, struct ares_options *options,
 		      int optmask);
 void ares_destroy(ares_channel channel);
-
+void ares_cancel(ares_channel channel);
 void ares_send(ares_channel channel, const unsigned char *qbuf, int qlen,
 	       ares_callback callback, void *arg);
 void ares_query(ares_channel channel, const char *name, int dnsclass,
@@ -125,6 +126,8 @@ int ares_mkquery(const char *name, int dnsclass, int type, unsigned short id,
 		 int rd, unsigned char **buf, int *buflen);
 int ares_expand_name(const unsigned char *encoded, const unsigned char *abuf,
 		     int alen, char **s, long *enclen);
+int ares_expand_string(const unsigned char *encoded, const unsigned char *abuf,
+		     int alen, unsigned char **s, long *enclen);
 int ares_parse_a_reply(const unsigned char *abuf, int alen,
 		       struct hostent **host);
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,

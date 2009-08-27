@@ -1,3 +1,27 @@
+  Changelog for the c-ares project
+
+Version 1.2.0 (April 13, 2004)
+
+* April 2, 2004
+- Updated various man pages to look nicer when converted to HTML on the web
+  site.
+
+* April 1, 2004
+- Dirk Manske provided a new function that is now named ares_cancel(). It is
+  used to cancel/cleanup a resolve/request made using ares functions on the
+  given ares channel. It does not destroy/kill the ares channel itself.
+
+- Dominick Meglio cleaned up the formatting in several man pages.
+
+* March 30, 2004
+- Dominick Meglio's new ares_expand_string. A helper function when decoding
+  incoming DNS packages.
+
+- Daniel Stenberg modified the Makefile.in to use a for loop for the man page
+  installation to improve overview and make it easier to add man pages.
+
+Version 1.1.0 (March 11, 2004)
+
 * March 9, 2004
 - Gisle Vanem improved build on Windows.
 
@@ -74,3 +98,5 @@ Version 1.0-pre1 (8 October 2003)
 - Daniel Stenberg adjusted the windows port
 
 - liren at vivisimo.com made the initial windows port
+
+* Imported the sources from ares 1.1.1

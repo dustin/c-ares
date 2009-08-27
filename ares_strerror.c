@@ -35,7 +35,9 @@ const char *ares_strerror(int code)
     "Timeout while contacting DNS servers",
     "End of file",
     "Error reading file",
-    "Out of memory"
+    "Out of memory",
+    "Channel is being destroyed",
+    "Misformatted string"
   };
 
   assert(code >= 0 && code < (int)(sizeof(errtext) / sizeof(*errtext)));
