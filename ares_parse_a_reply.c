@@ -35,8 +35,9 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
 		       struct hostent **host)
 {
   unsigned int qdcount, ancount;
-  int status, i, len, rr_type, rr_class, rr_len, naddrs;
+  int status, i, rr_type, rr_class, rr_len, naddrs;
   int naliases;
+  long len;
   const unsigned char *aptr;
   char *hostname, *rr_name, *rr_data, **aliases;
   struct in_addr *addrs;
@@ -85,7 +86,7 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
   naliases = 0;
 
   /* Examine each answer resource record (RR) in turn. */
-  for (i = 0; i < ancount; i++)
+  for (i = 0; i < (int)ancount; i++)
     {
       /* Decode the RR up to the data field. */
       status = ares_expand_name(aptr, abuf, alen, &rr_name, &len);

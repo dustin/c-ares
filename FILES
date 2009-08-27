@@ -8,11 +8,12 @@ CHANGES
 FILES
 maketgz
 aclocal.m4
+acinclude.m4
 Makefile.in
 install-sh
 mkinstalldirs
 configure
-configure.in
+configure.ac
 config.guess
 config.sub
 vc/adig/adig.dep

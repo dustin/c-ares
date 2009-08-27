@@ -1,4 +1,4 @@
-/* $Id: ares.h,v 1.2 2004/02/02 15:59:12 bagder Exp $ */
+/* $Id: ares.h,v 1.6 2004/02/25 07:22:00 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -19,6 +19,13 @@
 #define ARES__H
 
 #include <sys/types.h>
+
+#ifdef _AIX
+/* HP-UX systems version 9, 10 and 11 lack sys/select.h and so does oldish
+   libc5-based Linux systems. Only include it on system that are known to
+   require it! */
+#include <sys/select.h>
+#endif
 
 #ifdef WIN32
 #include <winsock.h>
@@ -117,12 +124,12 @@ void ares_process(ares_channel channel, fd_set *read_fds, fd_set *write_fds);
 int ares_mkquery(const char *name, int dnsclass, int type, unsigned short id,
 		 int rd, unsigned char **buf, int *buflen);
 int ares_expand_name(const unsigned char *encoded, const unsigned char *abuf,
-		     int alen, char **s, int *enclen);
+		     int alen, char **s, long *enclen);
 int ares_parse_a_reply(const unsigned char *abuf, int alen,
 		       struct hostent **host);
 int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 			 int addrlen, int family, struct hostent **host);
-void ares_free_string(char *str);
+void ares_free_string(void *str);
 void ares_free_hostent(struct hostent *host);
 const char *ares_strerror(int code);
 void ares_free_errmem(char *mem);

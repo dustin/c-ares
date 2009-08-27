@@ -34,7 +34,8 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 			 int addrlen, int family, struct hostent **host)
 {
   unsigned int qdcount, ancount;
-  int status, i, len, rr_type, rr_class, rr_len;
+  int status, i, rr_type, rr_class, rr_len;
+  long len;
   const unsigned char *aptr;
   char *ptrname, *hostname, *rr_name, *rr_data;
   struct hostent *hostent;
@@ -66,7 +67,7 @@ int ares_parse_ptr_reply(const unsigned char *abuf, int alen, const void *addr,
 
   /* Examine each answer resource record (RR) in turn. */
   hostname = NULL;
-  for (i = 0; i < ancount; i++)
+  for (i = 0; i < (int)ancount; i++)
     {
       /* Decode the RR up to the data field. */
       status = ares_expand_name(aptr, abuf, alen, &rr_name, &len);

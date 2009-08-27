@@ -1,7 +1,11 @@
+#ifndef ARES_NAMESER_H
+#define ARES_NAMESER_H
+
 /* Windows-only header file provided by liren@vivisimo.com to make his Windows
    port build */
 
 #include <windows.h>
+#include <process.h> /* for the _getpid() proto */
 #include <sys/types.h>
 
 #define MAXHOSTNAMELEN 256
@@ -17,7 +21,8 @@ struct iovec
 
 #define getpid() _getpid()
 
-int strcasecmp(const char *a, const char *b);
+struct timezone { int dummy; };
+
 int ares_gettimeofday(struct timeval *tv, struct timezone *tz);
 #define gettimeofday(tv,tz) ares_gettimeofday(tv,tz)
 
@@ -154,6 +159,7 @@ typedef enum __ns_rcode {
 #define SERVFAIL        ns_r_servfail
 #define NOTIMP          ns_r_notimpl
 #define REFUSED         ns_r_refused
+#undef NOERROR /* it seems this is already defined in winerror.h */
 #define NOERROR         ns_r_noerror
 #define FORMERR         ns_r_formerr
 #define NXDOMAIN        ns_r_nxdomain
@@ -204,3 +210,17 @@ typedef enum __ns_rcode {
 #define T_MAILB         ns_t_mailb
 #define T_MAILA         ns_t_maila
 #define T_ANY           ns_t_any
+
+#ifndef __MINGW32__
+/* protos for the functions we provide in windows_port.c */
+int ares_strncasecmp(const char *s1, const char *s2, size_t n);
+int ares_strcasecmp(const char *s1, const char *s2);
+
+/* use this define magic to prevent us from adding symbol names to the library
+   that is a high-risk to collide with another libraries' attempts to do the
+   same */
+#define strncasecmp(a,b,c) ares_strncasecmp(a,b,c)
+#define strcasecmp(a,b) ares_strcasecmp(a,b)
+#endif
+
+#endif /* ARES_NAMESER_H */

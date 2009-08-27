@@ -1,4 +1,4 @@
-/* $Id: ares_private.h,v 1.1 2003/10/07 21:54:04 bagder Exp $ */
+/* $Id: ares_private.h,v 1.4 2004/02/27 13:21:47 bagder Exp $ */
 
 /* Copyright 1998 by the Massachusetts Institute of Technology.
  *
@@ -56,8 +56,8 @@
 
 struct send_request {
   /* Remaining data to send */
-  const char *data;
-  int len;
+  const unsigned char *data;
+  size_t len;
 
   /* Next request in queue */
   struct send_request *next;
@@ -88,11 +88,11 @@ struct query {
   time_t timeout;
 
   /* Query buf with length at beginning, for TCP transmission */
-  char *tcpbuf;
+  unsigned char *tcpbuf;
   int tcplen;
 
   /* Arguments passed to ares_send() (qbuf points into tcpbuf) */
-  const char *qbuf;
+  const unsigned char *qbuf;
   int qlen;
   ares_callback callback;
   void *arg;
@@ -143,3 +143,11 @@ void ares__send_query(ares_channel channel, struct query *query, time_t now);
 void ares__close_sockets(struct server_state *server);
 int ares__get_hostent(FILE *fp, struct hostent **host);
 int ares__read_line(FILE *fp, char **buf, int *bufsize);
+
+#ifdef CURLDEBUG
+/* This is low-level hard-hacking memory leak tracking and similar. Using the
+   libcurl lowlevel code from within library is ugly and only works when
+   c-ares is built and linked with a similarly debug-build libcurl, but we do
+   this anyway for convenience. */
+#include "../lib/memdebug.h"
+#endif

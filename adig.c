@@ -140,7 +140,6 @@ int main(int argc, char **argv)
   struct hostent *hostent;
   fd_set read_fds, write_fds;
   struct timeval *tvp, tv;
-  char *errmem;
 
 #ifdef WIN32
   WORD wVersionRequested = MAKEWORD(1,1);
@@ -240,7 +239,6 @@ int main(int argc, char **argv)
     {
       fprintf(stderr, "ares_init_options: %s\n",
 	      ares_strerror(status));
-      ares_free_errmem(errmem);
       return 1;
     }
 
@@ -281,9 +279,9 @@ int main(int argc, char **argv)
 
 static void callback(void *arg, int status, unsigned char *abuf, int alen)
 {
-  char *name = (char *) arg, *errmem;
-  int id, qr, opcode, aa, tc, rd, ra, rcode, i;
-  unsigned int qdcount, ancount, nscount, arcount;
+  char *name = (char *) arg;
+  int id, qr, opcode, aa, tc, rd, ra, rcode;
+  unsigned int qdcount, ancount, nscount, arcount, i;
   const unsigned char *aptr;
 
   /* Display the query name if given. */
@@ -296,7 +294,6 @@ static void callback(void *arg, int status, unsigned char *abuf, int alen)
   if (status != ARES_SUCCESS)
     {
       printf("%s\n", ares_strerror(status));
-      ares_free_errmem(errmem);
       if (!abuf)
 	return;
     }
@@ -373,7 +370,8 @@ static const unsigned char *display_question(const unsigned char *aptr,
 					     int alen)
 {
   char *name;
-  int type, dnsclass, status, len;
+  int type, dnsclass, status;
+  long len;
 
   /* Parse the question name. */
   status = ares_expand_name(aptr, abuf, alen, &name, &len);
@@ -411,7 +409,8 @@ static const unsigned char *display_rr(const unsigned char *aptr,
 {
   const unsigned char *p;
   char *name;
-  int type, dnsclass, ttl, dlen, status, len;
+  int type, dnsclass, ttl, dlen, status;
+  long len;
   struct in_addr addr;
 
   /* Parse the RR name. */
