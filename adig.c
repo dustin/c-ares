@@ -28,15 +28,14 @@ static const char rcsid[] = "$Id: adig.c,v 1.9 2001/05/18 20:59:51 ghudson Exp $
 #include <unistd.h>
 #include <errno.h>
 #include <netdb.h>
+#include <getopt.h>
+
 #include "ares.h"
 #include "ares_dns.h"
 
 #ifndef INADDR_NONE
 #define	INADDR_NONE 0xffffffff
 #endif
-
-extern int optind;
-extern char *optarg;
 
 struct nv {
   const char *name;
